@@ -150,6 +150,8 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
     Object      _dataViewsForTableColumns;
     Object      _cachedDataViews;
 
+    BOOL        _hasVariableRowHeight;
+
     //Configuring Behavior
     BOOL        _allowsColumnReordering;
     BOOL        _allowsColumnResizing;
@@ -160,8 +162,6 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
     //Setting Display Attributes
     CGSize      _intercellSpacing;
     float       _rowHeight;
-
-    BOOL        _hasVariableRowHeight;
 
     BOOL        _usesAlternatingRowBackgroundColors;
     CPArray     _alternatingRowBackgroundColors;
@@ -1201,7 +1201,7 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
     
     if (row > [self numberOfRows])
         return -1;
-    
+
     return row;
 }
 
@@ -2359,17 +2359,21 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
 */
 - (BOOL)continueTracking:(CGPoint)lastPoint at:(CGPoint)aPoint
 {
-    var row = [self rowAtPoint:aPoint];
+    var row = [self rowAtPoint:aPoint],
+        canSelect = YES;
+        
+    if ((_implementedDelegateMethods & CPTableViewDelegate_tableView_shouldSelectRow_))
+        canSelect = [_delegate tableView:self shouldSelectRow:row];
 
     // begin the drag is the datasource lets us, we've move at least +-3px vertical or horizontal, or we're dragging from selected rows and we haven't begun a drag session
     if
     (
-        !_isSelectingSession &&
+        !canSelect || (!_isSelectingSession &&
         (_implementedDataSourceMethods & CPTableViewDataSource_tableView_writeRowsWithIndexes_toPasteboard_) &&
         (
             (lastPoint.x - aPoint.x > 3 || (_verticalMotionCanDrag && ABS(lastPoint.y - aPoint.y) > 3))
             || ([_selectedRowIndexes containsIndex:row])
-        )
+        ))
     )
     {
         if ([_selectedRowIndexes containsIndex:row])
@@ -2580,7 +2584,7 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
 - (CPInteger)_proposedRowAtPoint:(CGPoint)dragPoint
 {
     var row = [self rowAtPoint:dragPoint];
-    
+
     // cocoa seems to jump to the next row when we approach the below row
     dragPoint.y += FLOOR(CPRectGetHeight([self rectOfRow:row]) / 4.0);
     row = [self rowAtPoint:dragPoint];
