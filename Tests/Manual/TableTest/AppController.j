@@ -22,7 +22,7 @@ CPLogRegister(CPLogConsole);
     dataSet1 = [],
     dataSet2 = [];
     
-    for(var i = 1; i < 5; i++)
+    for (var i = 1; i < 500; i++)
     {
         dataSet1[i - 1] = i;
         dataSet2[i - 1] = i + 10;
@@ -217,10 +217,11 @@ CPLogRegister(CPLogConsole);
     }
 }
 
-// - (id)tableView:(CPTableView)tableView heightOfRow:(int)row
-// {
-//     return 50;
-// }
+- (id)tableView:(CPTableView)tableView heightOfRow:(int)theRowIndex
+{
+	// CPLog.debug(@"height of row: %i", theRowIndex);
+    return 50;
+}
 
 //- (void)tableViewSelectionIsChanging:(CPNotification)aNotification
 //{
@@ -241,7 +242,7 @@ CPLogRegister(CPLogConsole);
    // if(rowIndex % 2 == 1)
    //   return true;
    // else
-        return NO;
+        return YES;
 }
 
 - (BOOL)selectionShouldChangeInTableView:(CPTableView)aTableView
@@ -252,17 +253,17 @@ CPLogRegister(CPLogConsole);
 
 - (void)tableViewSelectionDidChange:(id)notification
 {
-    CPLogConsole(_cmd + [notification description]);
+    // CPLogConsole(_cmd + [notification description]);
 }
 
 - (void)tableViewSelectionIsChanging:(id)notification
 {
-    CPLogConsole(_cmd + [notification description]);
+    // CPLogConsole(_cmd + [notification description]);
 }
 
 - (void)tableViewColumnDidResize:(id)notification
 {
-    CPLogConsole(_cmd + [notification description]);
+    // CPLogConsole(_cmd + [notification description]);
 }
 
 //- (CPIndexSet)tableView:(CPTableView)tableView selectionIndexesForProposedSelection:(CPIndexSet)proposedSelectionIndexes
@@ -301,7 +302,7 @@ CPLogRegister(CPLogConsole);
  //   console.log([aTableView rectOfRow:0]);
     //console.log(row)
 
-    CPLog.debug(@"proposed row: %i", row);
+    // CPLog.debug(@"proposed row: %i", row);
 
     [[aTableView window] orderFront:nil];
 

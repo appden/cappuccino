@@ -149,6 +149,7 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
 
     Object      _dataViewsForTableColumns;
     Object      _cachedDataViews;
+	Object		_cachedRowRects;
 
     BOOL        _hasVariableRowHeight;
 
@@ -235,6 +236,7 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
         _exposedRows = [CPIndexSet indexSet];
         _exposedColumns = [CPIndexSet indexSet];
         _cachedDataViews = { };
+		_cachedRowRects = {};
         _intercellSpacing = _CGSizeMake(0.0, 0.0);
         _rowHeight = 23.0;
 
@@ -350,6 +352,7 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
 
     // This updates the size too.
     [self noteNumberOfRowsChanged];
+	[self noteHeightOfRowsWithIndexesChanged:_exposedRows];
 
     [self setNeedsLayout];
     [self setNeedsDisplay:YES];
@@ -1042,7 +1045,13 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
 {
     if (aRowIndex < 0)
         return CPRectMakeZero();
-    
+	
+	if (_hasVariableRowHeight && _cachedRowRects[aRowIndex])
+	{
+		// CPLog.debug(@"returned cached rect: %@ of row: %i", CPStringFromRect(_cachedRowRects[aRowIndex]), aRowIndex);
+		return _cachedRowRects[aRowIndex];
+	}
+	
     var rowHeight = _rowHeight;
     
     if ((_implementedDelegateMethods & CPTableViewDelegate_tableView_heightOfRow_))
@@ -1052,10 +1061,15 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
     }
     else
         _hasVariableRowHeight = NO;
-    
+ 
     // FIXME: WRONG: ASK TABLE COLUMN RANGE
-    var previousRowRect = [self rectOfRow:aRowIndex - 1];
-    return CPRectMake(0.0, CPRectGetMaxY(previousRowRect) + _intercellSpacing.height, CPRectGetWidth([self bounds]), rowHeight);
+    var previousRowRect = [self rectOfRow:aRowIndex - 1],
+		rect = CPRectMake(0.0, CPRectGetMaxY(previousRowRect) + _intercellSpacing.height, CPRectGetWidth([self bounds]), rowHeight);
+	
+	// CPLog.debug(@"cache rect: %@ of row: %i", CPStringFromRect(rect), aRowIndex);
+	_cachedRowRects[aRowIndex] = rect;
+
+    return rect;
 }
 
 // Complexity:
@@ -1171,9 +1185,7 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
 }
 
 - (CPInteger)rowAtPoint:(CGPoint)aPoint
-{
-    CPLog.debug(@"row at point: %@", CPStringFromPoint(aPoint));
-    
+{    
     var row = -1;
 
     // Check if we are using variable sized rows so we can use the quicker way to determine the row at point
@@ -1372,6 +1384,7 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
 - (void)noteNumberOfRowsChanged
 {
     _numberOfRows = [_dataSource numberOfRowsInTableView:self];
+	_cachedRowRects = {};
 
     [self tile];
 }
@@ -1397,6 +1410,21 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
 
     [self setNeedsLayout];
     [self setNeedsDisplay:YES];
+}
+
+- (void)noteHeightOfRowsWithIndexesChanged:(CPIndexSet)theIndexSet
+{
+	if (!_hasVariableRowHeight)
+		return;
+	
+	var rowIndexes = [];
+	[theIndexSet getIndexes:rowIndexes maxCount:-1 inIndexRange:nil];
+	
+	var rowIndex = [rowIndexes count];
+	while (rowIndex--)
+		_cachedRowRects[rowIndex] = [self rectOfRow:rowIndex];
+	
+	[self tile];
 }
 
 /*
@@ -2622,8 +2650,6 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
         dropOperation = [self _proposedDropOperationAtPoint:location],
         numberOfRows = [self numberOfRows];
 
-    CPLog.debug(@"dragging updated at location: %@", CPStringFromPoint(location));
-
     var row = [self _proposedRowAtPoint:location],
         dragOperation = [self _validateDrop:sender proposedRow:row proposedDropOperation:dropOperation];
         exposedClipRect = [self exposedClipRect];
@@ -2975,6 +3001,7 @@ var CPTableViewDataSourceKey        = @"CPTableViewDataSourceKey",
         _numberOfHiddenColumns = 0;
 
         _objectValues = { };
+		_cachedRowRects = {};
         _dataViewsForTableColumns = { };
         _dataViews=  [];
         _numberOfRows = 0;
