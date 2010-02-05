@@ -1057,7 +1057,7 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
     
     // FIXME: WRONG: ASK TABLE COLUMN RANGE
     var previousRowRect = [self rectOfRow:aRowIndex - 1];
-    return CPRectMake(0.0, CPRectGetMaxY(previousRowRect) + _intercellSpacing.height, CPRectGetWidth([self bounds]), _rowHeight);
+    return CPRectMake(0.0, CPRectGetMaxY(previousRowRect) + _intercellSpacing.height, CPRectGetWidth([self bounds]), rowHeight);
 }
 
 // Complexity:
