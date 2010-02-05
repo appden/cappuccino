@@ -1048,9 +1048,7 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
     if ((_implementedDelegateMethods & CPTableViewDelegate_tableView_heightOfRow_))
     {
         rowHeight = [_delegate tableView:self heightOfRow:aRowIndex];
-
-        if (rowHeight !== _rowHeight)
-            _hasVariableRowHeight = YES;
+        _hasVariableRowHeight = YES;
     }
     else
         _hasVariableRowHeight = NO;
@@ -1174,6 +1172,8 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
 
 - (CPInteger)rowAtPoint:(CGPoint)aPoint
 {
+    CPLog.debug(@"row at point: %@", CPStringFromPoint(aPoint));
+    
     var row = -1;
 
     // Check if we are using variable sized rows so we can use the quicker way to determine the row at point
@@ -1190,13 +1190,13 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
         while (rowIndex--)
         {
             row = [rowArray objectAtIndex:rowIndex];
-            
+
             if (CPRectContainsPoint([self rectOfRow:row], aPoint))
                 break;
-        }
 
-        // Make sure we return -1 if we could not find a row
-        row = -1;
+            // Make sure we return -1 if we could not find a row
+            row = -1;
+        }
     }
     
     if (row > [self numberOfRows])
@@ -2375,7 +2375,7 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
             || ([_selectedRowIndexes containsIndex:row])
         ))
     )
-    {
+    {    
         if ([_selectedRowIndexes containsIndex:row])
             _draggedRowIndexes = [[CPIndexSet alloc] initWithIndexSet:_selectedRowIndexes];
         else
@@ -2621,6 +2621,8 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
     var location = [self convertPoint:[sender draggingLocation] fromView:nil],
         dropOperation = [self _proposedDropOperationAtPoint:location],
         numberOfRows = [self numberOfRows];
+
+    CPLog.debug(@"dragging updated at location: %@", CPStringFromPoint(location));
 
     var row = [self _proposedRowAtPoint:location],
         dragOperation = [self _validateDrop:sender proposedRow:row proposedDropOperation:dropOperation];
