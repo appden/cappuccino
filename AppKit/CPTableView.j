@@ -1054,13 +1054,8 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
 	
     var rowHeight = _rowHeight;
     
-    if ((_implementedDelegateMethods & CPTableViewDelegate_tableView_heightOfRow_))
-    {
+    if (_hasVariableRowHeight)
         rowHeight = [_delegate tableView:self heightOfRow:aRowIndex];
-        _hasVariableRowHeight = YES;
-    }
-    else
-        _hasVariableRowHeight = NO;
  
     // FIXME: WRONG: ASK TABLE COLUMN RANGE
     var previousRowRect = [self rectOfRow:aRowIndex - 1],
@@ -1393,10 +1388,12 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
 {
     UPDATE_COLUMN_RANGES_IF_NECESSARY();
 
-    // FIXME: variable row heights.
     var width = _tableColumnRanges.length > 0 ? CPMaxRange([_tableColumnRanges lastObject]) : 0.0,
         height = (_rowHeight + _intercellSpacing.height) * _numberOfRows,
         superview = [self superview];
+		
+	if (_hasVariableRowHeight)
+		height = CGRectGetMaxY([self rectOfRow:([self numberOfRows] - 1)]);
 
     if ([superview isKindOfClass:[CPClipView class]])
     {
@@ -1585,6 +1582,8 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
             selector:@selector(tableViewSelectionIsChanging:)
             name:CPTableViewSelectionIsChangingNotification
             object:self];
+
+	_hasVariableRowHeight = !!(_implementedDelegateMethods & CPTableViewDelegate_tableView_heightOfRow_);
 }
 
 - (id)delegate
