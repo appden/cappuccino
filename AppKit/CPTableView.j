@@ -1414,13 +1414,14 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
 	if (!_hasVariableRowHeight)
 		return;
 	
-	var rowIndexes = [];
-	[theIndexSet getIndexes:rowIndexes maxCount:-1 inIndexRange:nil];
+	// assuming theIndexSet is ordered...
+	var numberOfRows = [self numberOfRows],
+		rowIndex = [theIndexSet firstIndex];
 	
-	var rowIndex = [rowIndexes count];
-	while (rowIndex--)
-		_cachedRowRects[rowIndex] = [self rectOfRow:rowIndex];
+	for (; rowIndex < numberOfRows; rowIndex++)
+		delete _cachedRowRects[rowIndex];
 	
+	_reloadAllRows = YES;
 	[self tile];
 }
 
