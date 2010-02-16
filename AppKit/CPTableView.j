@@ -1848,7 +1848,7 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
 
     // Now clear all the leftovers
     // FIXME: this could be faster!
-    for (identifier in _cachedDataViews)
+    for (var identifier in _cachedDataViews)
     {
         var dataViews = _cachedDataViews[identifier],
             count = dataViews.length;
