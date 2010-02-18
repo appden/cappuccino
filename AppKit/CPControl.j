@@ -27,47 +27,42 @@
 #include "CoreGraphics/CGGeometry.h"
 #include "Platform/Platform.h"
 
-/*
-    @global
-    @group CPTextAlignment
-*/
-CPLeftTextAlignment         = 0;
-/*
-    @global
-    @group CPTextAlignment
-*/
-CPRightTextAlignment        = 1;
-/*
-    @global
-    @group CPTextAlignment
-*/
-CPCenterTextAlignment       = 2;
-/*
-    @global
-    @group CPTextAlignment
-*/
-CPJustifiedTextAlignment    = 3;
-/*
-    @global
-    @group CPTextAlignment
-*/
-CPNaturalTextAlignment      = 4;
+CPLeftTextAlignment             = 0;
+CPRightTextAlignment            = 1;
+CPCenterTextAlignment           = 2;
+CPJustifiedTextAlignment        = 3;
+CPNaturalTextAlignment          = 4;
 
-/*
-    @global
-    @group CPControlSize
-*/
-CPRegularControlSize        = 0;
-/*
-    @global
-    @group CPControlSize
-*/
-CPSmallControlSize          = 1;
-/*
-    @global
-    @group CPControlSize
-*/
-CPMiniControlSize           = 2;
+CPRegularControlSize            = 0;
+CPSmallControlSize              = 1;
+CPMiniControlSize               = 2;
+
+CPLineBreakByWordWrapping       = 0;
+CPLineBreakByCharWrapping       = 1;
+CPLineBreakByClipping           = 2;
+CPLineBreakByTruncatingHead     = 3;
+CPLineBreakByTruncatingTail     = 4;
+CPLineBreakByTruncatingMiddle   = 5;
+
+CPTopVerticalTextAlignment      = 1,
+CPCenterVerticalTextAlignment   = 2,
+CPBottomVerticalTextAlignment   = 3;
+
+CPScaleProportionally   = 0;
+CPScaleToFit            = 1;
+CPScaleNone             = 2;
+
+CPNoImage       = 0;
+CPImageOnly     = 1;
+CPImageLeft     = 2;
+CPImageRight    = 3;
+CPImageBelow    = 4;
+CPImageAbove    = 5;
+CPImageOverlaps = 6;
+
+CPOnState                       = 1;
+CPOffState                      = 0;
+CPMixedState                    = -1;
 
 CPControlNormalBackgroundColor      = "CPControlNormalBackgroundColor";
 CPControlSelectedBackgroundColor    = "CPControlSelectedBackgroundColor";
@@ -112,7 +107,7 @@ var CPControlBlackColor     = [CPColor blackColor];
                                                 CPLineBreakByClipping,
                                                 [CPColor blackColor],
                                                 [CPFont systemFontOfSize:12.0],
-                                                nil,
+                                                [CPNull null],
                                                 _CGSizeMakeZero(),
                                                 CPImageLeft,
                                                 CPScaleToFit,
