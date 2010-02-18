@@ -390,9 +390,6 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
     // This updates the size too.
     [self noteNumberOfRowsChanged];
 	[self noteHeightOfRowsWithIndexesChanged:_exposedRows];
-
-    [self setNeedsLayout];
-    [self setNeedsDisplay:YES];
 }
 
 //Target-action Behavior
