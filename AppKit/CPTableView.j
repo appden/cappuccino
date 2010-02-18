@@ -252,7 +252,7 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
         _exposedRows = [CPIndexSet indexSet];
         _exposedColumns = [CPIndexSet indexSet];
         _cachedDataViews = { };
-		_cachedRowRects = {};
+		_cachedRowRects = { };
         _intercellSpacing = _CGSizeMake(0.0, 0.0);
         _rowHeight = 23.0;
 
@@ -1433,7 +1433,7 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
 - (void)noteNumberOfRowsChanged
 {
     _numberOfRows = [_dataSource numberOfRowsInTableView:self];
-	_cachedRowRects = {};
+	_cachedRowRects = { };
 
     [self tile];
 }
@@ -2694,7 +2694,7 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
     return YES;
 }
 
-/*!
+/*
     @ignore
 */
 - (void)stopTracking:(CGPoint)lastPoint at:(CGPoint)aPoint mouseIsUp:(BOOL)mouseIsUp
@@ -3243,7 +3243,7 @@ var CPTableViewDataSourceKey                = @"CPTableViewDataSourceKey",
         _numberOfHiddenColumns = 0;
 
         _objectValues = { };
-		_cachedRowRects = {};
+		_cachedRowRects = { };
         _dataViewsForTableColumns = { };
         _dataViews=  [];
         _numberOfRows = 0;
