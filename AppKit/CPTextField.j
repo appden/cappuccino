@@ -69,6 +69,7 @@ var CPSecureTextFieldCharacter = "\u2022";
 
 CPTextFieldStateRounded     = CPThemeState("rounded");
 CPTextFieldStatePlaceholder = CPThemeState("placeholder");
+CPThemeStateEditable		= CPThemeState("editable");
 
 /*!
     @ingroup appkit
@@ -164,8 +165,8 @@ CPTextFieldStatePlaceholder = CPThemeState("placeholder");
 
 + (id)themeAttributes
 {
-    return [CPDictionary dictionaryWithObjects:[_CGInsetMakeZero(), _CGInsetMake(2.0, 2.0, 2.0, 2.0), [CPNull null]]
-                                       forKeys:[@"bezel-inset", @"content-inset", @"bezel-color"]];
+    return [CPDictionary dictionaryWithObjects:[_CGInsetMakeZero(), _CGInsetMake(2.0, 2.0, 2.0, 2.0), [CPNull null], [CPNull null], _CGInsetMakeZero()]
+                                       forKeys:[@"bezel-inset", @"content-inset", @"bezel-color", @"focus-ring-color", @"focus-inset"]];
 }
 
 /* @ignore */
@@ -296,6 +297,11 @@ CPTextFieldStatePlaceholder = CPThemeState("placeholder");
 - (void)setEditable:(BOOL)shouldBeEditable
 {
     _isEditable = shouldBeEditable;
+    
+    if (shouldBeEditable)
+        [self setThemeState:CPThemeStateEditable];
+    else
+        [self unsetThemeState:CPThemeStateEditable];
 }
 
 /*!
@@ -1047,10 +1053,28 @@ CPTextFieldStatePlaceholder = CPThemeState("placeholder");
     return bounds;
 }
 
+- (CGRect)focusRingRectForBounds:(CFRect)bounds
+{
+    var focusRingInset = [self currentValueForThemeAttribute:@"focus-inset"];
+
+    if (_CGInsetIsEmpty(focusRingInset))
+        return bounds;
+    
+    bounds.origin.x += focusRingInset.left;
+    bounds.origin.y += focusRingInset.top;
+    bounds.size.width -= focusRingInset.left + focusRingInset.right;
+    bounds.size.height -= focusRingInset.top + focusRingInset.bottom;
+    
+    return bounds;
+}
+
 - (CGRect)rectForEphemeralSubviewNamed:(CPString)aName
 {
     if (aName === "bezel-view")
         return [self bezelRectForBounds:[self bounds]];
+  	
+  	else if (aName === "focus-ring-view")
+        return [self focusRingRectForBounds:[self bounds]];
     
     else if (aName === "content-view")
         return [self contentRectForBounds:[self bounds]];
@@ -1061,6 +1085,14 @@ CPTextFieldStatePlaceholder = CPThemeState("placeholder");
 - (CPView)createEphemeralSubviewNamed:(CPString)aName
 {
     if (aName === "bezel-view")
+    {
+        var view = [[CPView alloc] initWithFrame:_CGRectMakeZero()];
+
+        [view setHitTests:NO];
+        
+        return view;
+    }
+    else if (aName === "focus-ring-view")
     {
         var view = [[CPView alloc] initWithFrame:_CGRectMakeZero()];
 
@@ -1083,6 +1115,12 @@ CPTextFieldStatePlaceholder = CPThemeState("placeholder");
 
 - (void)layoutSubviews
 {
+	var focusRingView = [self layoutEphemeralSubviewNamed:@"focus-ring-view"
+                                           positioned:CPWindowBelow
+                      relativeToEphemeralSubviewNamed:@"content-view"];
+   	if (focusRingView)
+        [focusRingView setBackgroundColor:[self currentValueForThemeAttribute:@"focus-ring-color"]];
+
     var bezelView = [self layoutEphemeralSubviewNamed:@"bezel-view"
                                            positioned:CPWindowBelow
                       relativeToEphemeralSubviewNamed:@"content-view"];
