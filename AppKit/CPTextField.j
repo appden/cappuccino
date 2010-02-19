@@ -41,6 +41,7 @@ CPTextFieldDidBlurNotification  = @"CPTextFieldDidBlurNotification";
 var CPTextFieldDOMInputElement = nil,
     CPTextFieldDOMPasswordInputElement = nil,
     CPTextFieldDOMStandardInputElement = nil,
+    CPTextFieldDOMMultilineInputElement = nil,
     CPTextFieldInputOwner = nil,
     CPTextFieldTextDidChangeValue = nil,
     CPTextFieldInputResigning = NO,
@@ -95,6 +96,7 @@ CPTextFieldStatePlaceholder = CPThemeState("placeholder");
     CPTextFieldBezelStyle   _bezelStyle;
     BOOL                    _isBordered;
     CPControlSize           _controlSize;
+    BOOL					_wraps; // if true we use a textarea 
 }
 
 + (CPTextField)textFieldWithStringValue:(CPString)aStringValue placeholder:(CPString)aPlaceholder width:(float)aWidth
@@ -211,7 +213,7 @@ CPTextFieldStatePlaceholder = CPThemeState("placeholder");
         CPTextFieldDOMStandardInputElement = CPTextFieldDOMInputElement;
     }
     
-    if (CPFeatureIsCompatible(CPInputTypeCanBeChangedFeature))
+    if (![self wraps] && CPFeatureIsCompatible(CPInputTypeCanBeChangedFeature))
     {
         if ([self isSecure])
             CPTextFieldDOMInputElement.type = "password";
@@ -239,6 +241,26 @@ CPTextFieldStatePlaceholder = CPThemeState("placeholder");
         }
         
         CPTextFieldDOMInputElement = CPTextFieldDOMPasswordInputElement;
+    }
+    else if ([self wraps])
+    {
+       	if (!CPTextFieldDOMMultilineInputElement)
+        {
+        	CPTextFieldDOMMultilineInputElement = document.createElement("textarea");
+        	CPTextFieldDOMMultilineInputElement.style.resize = "none";
+        	CPTextFieldDOMMultilineInputElement.style.overflow = "hidden";
+            CPTextFieldDOMMultilineInputElement.style.position = "absolute";
+            CPTextFieldDOMMultilineInputElement.style.border = "0px";
+            CPTextFieldDOMMultilineInputElement.style.padding = "0px";
+            CPTextFieldDOMMultilineInputElement.style.margin = "0px";
+            CPTextFieldDOMMultilineInputElement.style.whiteSpace = "pre";
+            CPTextFieldDOMMultilineInputElement.style.background = "transparent";
+            CPTextFieldDOMMultilineInputElement.style.outline = "none";
+					
+            CPTextFieldDOMMultilineInputElement.onblur = CPTextFieldBlurFunction;
+        }
+        
+        CPTextFieldDOMInputElement = CPTextFieldDOMMultilineInputElement;	
     }
     else
     {
@@ -613,15 +635,28 @@ CPTextFieldStatePlaceholder = CPThemeState("placeholder");
 - (void)keyDown:(CPEvent)anEvent
 {
     if ([anEvent keyCode] === CPReturnKeyCode)
-    {
-        if (_isEditing)
+    {        
+        if (![self wraps])
         {
-            _isEditing = NO;
-            [self textDidEndEditing:[CPNotification notificationWithName:CPControlTextDidEndEditingNotification object:self userInfo:nil]];
+            if (_isEditing)
+            {
+                _isEditing = NO;
+                [self textDidEndEditing:[CPNotification notificationWithName:CPControlTextDidEndEditingNotification object:self userInfo:nil]];
+            }
+            
+            [self selectText:nil];
+            [self sendAction:[self action] to:[self target]];
+            [[[self window] platformWindow] _propagateCurrentDOMEvent:NO];
+            [[CPRunLoop currentRunLoop] limitDateForMode:CPDefaultRunLoopMode];
+            return;
         }
+        else
+        {
+            [[[self window] platformWindow] _propagateCurrentDOMEvent:YES];
 
-        [self sendAction:[self action] to:[self target]];
-        [self selectText:nil];
+            [[CPRunLoop currentRunLoop] limitDateForMode:CPDefaultRunLoopMode];
+            return;
+        }
 
         [[[self window] platformWindow] _propagateCurrentDOMEvent:NO];
     }
@@ -1085,6 +1120,16 @@ CPTextFieldStatePlaceholder = CPThemeState("placeholder");
         [contentView setTextShadowColor:[self currentValueForThemeAttribute:@"text-shadow-color"]];
         [contentView setTextShadowOffset:[self currentValueForThemeAttribute:@"text-shadow-offset"]];
     }
+}
+
+- (void)setWraps:(BOOL)aFlag
+{
+	_wraps = aFlag;
+}
+
+- (BOOL)wraps
+{
+	return _wraps;
 }
 
 @end
