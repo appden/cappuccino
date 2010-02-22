@@ -1,12 +1,11 @@
-#!/usr/bin/env narwhal
+
+require("./common.jake");
 
 var FILE = require("file"),
     SYSTEM = require("system"),
     OS = require("os"),
     jake = require("jake"),
     stream = require("term").stream;
-
-require(FILE.absolute("common.jake"));
 
 var subprojects = ["Objective-J", "CommonJS", "Foundation", "AppKit", "Tools"];
 
@@ -166,13 +165,13 @@ task ("deploy", ["downloads"], function()
     var starter_zip_output = FILE.join($BUILD_DIR, 'Cappuccino', 'Starter.zip');
     rm_rf(starter_zip_output);
 
-    OS.system("cd " + cappuccino_output_path + " && zip -ry -8 Starter.zip Starter");
+    OS.system("cd " + OS.enquote(cappuccino_output_path) + " && zip -ry -8 Starter.zip Starter");
 
     // zip the tools pack
     var tools_zip_output = FILE.join($BUILD_DIR, 'Cappuccino', 'Tools.zip')
     rm_rf(tools_zip_output);
 
-    OS.system("cd " + cappuccino_output_path + " && zip -ry -8 Tools.zip Tools");
+    OS.system("cd " + OS.enquote(cappuccino_output_path) + " && zip -ry -8 Tools.zip Tools");
 });
 
 // Testing
@@ -184,7 +183,7 @@ task("test-only", function()
     var tests = new FileList('Tests/**/*Test.j');
     var cmd = ["ojtest"].concat(tests.items());
 
-    var code = OS.system(cmd);
+    var code = OS.system(serializedENV() + " " + cmd.map(OS.enquote).join(" "));
     if (code !== 0)
         OS.exit(code);
 });
