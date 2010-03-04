@@ -847,9 +847,12 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
                 dataView = dataViewsInTableColumn[rowIndex];
             [dataView unsetThemeState:CPThemeStateHighlighted];
         }
-
-        var headerView = [_tableColumns[columnIndex] headerView];
-        [headerView unsetThemeState:CPThemeStateHighlighted];
+        
+        if (_headerView)
+        {
+            var headerView = [_tableColumns[columnIndex] headerView];
+            [headerView unsetThemeState:CPThemeStateHighlighted];
+        }
     }
 
     count = selectColumns.length;
@@ -865,9 +868,11 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
                 dataView = dataViewsInTableColumn[rowIndex];
             [dataView setThemeState:CPThemeStateHighlighted];
         }
-        
-        var headerView = [_tableColumns[columnIndex] headerView];
-        [headerView setThemeState:CPThemeStateHighlighted];
+        if (_headerView)
+        {
+            var headerView = [_tableColumns[columnIndex] headerView];
+            [headerView setThemeState:CPThemeStateHighlighted];
+        }
     }
 }
 
@@ -1722,12 +1727,15 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
 {   
     if (_currentHighlightedTableColumn == aTableColumn)
         return;
-        
-    if (_currentHighlightedTableColumn != nil)
-        [[_currentHighlightedTableColumn headerView] unsetThemeState:CPThemeStateHighlighted];
+    
+    if (_headerView)
+    {
+        if (_currentHighlightedTableColumn != nil)
+            [[_currentHighlightedTableColumn headerView] unsetThemeState:CPThemeStateHighlighted];
    
-    if (aTableColumn != nil)
-        [[aTableColumn headerView] setThemeState:CPThemeStateHighlighted];
+        if (aTableColumn != nil)
+            [[aTableColumn headerView] setThemeState:CPThemeStateHighlighted];
+    }
     
     _currentHighlightedTableColumn = aTableColumn;
 }
@@ -2077,7 +2085,7 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
             {
                 if (!isButton)
                     _editingCellIndex = undefined;
-                
+
                 if (isTextField)
                 {
                     [dataView setEditable:YES];
@@ -2085,7 +2093,7 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
                     [dataView setSelectable:YES];
                     [dataView selectText:nil]; // Doesn't seem to actually work (yet?).
                 }
-                
+
                 [dataView setTarget:self];
                 [dataView setAction:@selector(_commitDataViewObjectValue:)];
                 dataView.tableViewEditedColumnObj = tableColumn;
