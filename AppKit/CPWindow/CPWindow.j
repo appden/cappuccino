@@ -1504,7 +1504,7 @@ CPTexturedBackgroundWindowMask
     [_inclusiveRegisteredDraggedTypes unionSet:pasteboardTypes];
 }
 
-- (void)_noteUnregisteredDraggedTypes:(CPArray)pasteboardTypes
+- (void)_noteUnregisteredDraggedTypes:(CPSet)pasteboardTypes
 {
     if (!pasteboardTypes)
         return;
@@ -1799,13 +1799,13 @@ CPTexturedBackgroundWindowMask
 */
 - (void)makeMainWindow
 {
-    if (![self canBecomeMainWindow])
+    if (CPApp._mainWindow === self || ![self canBecomeMainWindow])
         return;
 
     [CPApp._mainWindow resignMainWindow];
-    
+
     CPApp._mainWindow = self;
-    
+
     [self becomeMainWindow];
 }
 

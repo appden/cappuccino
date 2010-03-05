@@ -379,10 +379,10 @@ CPRunContinuesResponse  = -1002;
 
         [applicationLabel setStringValue:applicationTitle || ""];
 
-        if (version && applicationVersion)
-            [versionLabel setStringValue:sprintf(@"Version %@ (%@)", applicationVersion, version)];
+        if (applicationVersion && version)
+            [versionLabel setStringValue:@"Version " + applicationVersion + " (" + version + ")"];
         else if (applicationVersion || version)
-            [versionLabel setStringValue:sprintf(@"Version %@", applicationVersion || version)];
+            [versionLabel setStringValue:@"Version " + (applicationVersion || version)];
         else
             [versionLabel setStringValue:@""];
 
@@ -1041,7 +1041,7 @@ var _CPAppBootstrapperActions = nil;
 {
 }
 
-+ (void)actions
++ (CPArray)actions
 {
     return [@selector(bootstrapPlatform), @selector(loadDefaultTheme), @selector(loadMainCibFile)];
 }
@@ -1076,7 +1076,7 @@ var _CPAppBootstrapperActions = nil;
     return YES;
 }
 
-+ (void)blendDidFinishLoading:(CPBundle)aBundle
++ (void)blendDidFinishLoading:(CPThemeBlend)aThemeBlend
 {
     [CPTheme setDefaultTheme:[CPTheme themeNamed:[CPApplication defaultThemeName]]];
 

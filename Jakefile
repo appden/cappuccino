@@ -1,12 +1,11 @@
-#!/usr/bin/env narwhal
+
+require("./common.jake");
 
 var FILE = require("file"),
     SYSTEM = require("system"),
     OS = require("os"),
     jake = require("jake"),
     stream = require("term").stream;
-
-require(FILE.absolute("common.jake"));
 
 var subprojects = ["Objective-J", "CommonJS", "Foundation", "AppKit", "Tools"];
 
@@ -57,7 +56,11 @@ task ("sudo-install", ["CommonJS"], function()
     // FIXME: require("narwhal/tusk/install").install({}, $COMMONJS);
     // Doesn't work due to some weird this.print business.
     if (OS.system(["sudo", "tusk", "install", "--force", $BUILD_CJS_OBJECTIVE_J, $BUILD_CJS_CAPPUCCINO]))
-        OS.exit(1); //rake abort if ($? != 0)
+    {
+        // Attempt a hackish work-around for sudo compiled with the --with-secure-path option
+        if (OS.system("sudo bash -c 'source " + getShellConfigFile() + "; tusk install --force " + $BUILD_CJS_OBJECTIVE_J + " " + $BUILD_CJS_CAPPUCCINO + "'"))
+            OS.exit(1); //rake abort if ($? != 0)
+    }
 });
 
 // Documentation
@@ -162,13 +165,13 @@ task ("deploy", ["downloads"], function()
     var starter_zip_output = FILE.join($BUILD_DIR, 'Cappuccino', 'Starter.zip');
     rm_rf(starter_zip_output);
 
-    OS.system("cd " + cappuccino_output_path + " && zip -ry -8 Starter.zip Starter");
+    OS.system("cd " + OS.enquote(cappuccino_output_path) + " && zip -ry -8 Starter.zip Starter");
 
     // zip the tools pack
     var tools_zip_output = FILE.join($BUILD_DIR, 'Cappuccino', 'Tools.zip')
     rm_rf(tools_zip_output);
 
-    OS.system("cd " + cappuccino_output_path + " && zip -ry -8 Tools.zip Tools");
+    OS.system("cd " + OS.enquote(cappuccino_output_path) + " && zip -ry -8 Tools.zip Tools");
 });
 
 // Testing
@@ -180,54 +183,91 @@ task("test-only", function()
     var tests = new FileList('Tests/**/*Test.j');
     var cmd = ["ojtest"].concat(tests.items());
 
-    var code = OS.system(cmd);
+    var code = OS.system(serializedENV() + " " + cmd.map(OS.enquote).join(" "));
     if (code !== 0)
         OS.exit(code);
 });
 
-task("push-packages", ["CommonJS", "push-cappuccino", "push-objective-j"]);
+task("push-packages", ["push-cappuccino", "push-objective-j"]);
 
 task("push-cappuccino", function() {
     pushPackage(
         $BUILD_CJS_CAPPUCCINO,
-        "git@github.com:280north/cappuccino-package.git"
+        "git@github.com:280north/cappuccino-package.git",
+        SYSTEM.env["PACKAGE_BRANCH"]
     );
 });
 
 task("push-objective-j", function() {
     pushPackage(
         $BUILD_CJS_OBJECTIVE_J,
-        "git@github.com:280north/objective-j-package.git"
+        "git@github.com:280north/objective-j-package.git",
+        SYSTEM.env["PACKAGE_BRANCH"]
     );
 });
 
-function pushPackage(path, remote)
+function pushPackage(path, remote, branch)
 {
-    stream.print("Pushing \0blue(" + path + "\0) to \0blue(" + remote + "\0)");
+    branch = branch || "master";
+    
+    stream.print("Pushing \0blue(" + path + "\0) to "+branch+" of \0blue(" + remote + "\0)");
 
     FILE.mkdirs(".push-package");
 
     var pushPackageDir = FILE.join(".push-package", remote.replace(/[^\w]/g, "_"));
 
     if (FILE.exists(pushPackageDir))
-        OS.system(buildCommandString([["cd", pushPackageDir], ["git", "pull"]]));
+        OS.system(buildCmd([["cd", pushPackageDir], ["git", "fetch"]]));
     else
         OS.system(["git", "clone", remote, pushPackageDir]);
 
-    OS.system("cd "+OS.enquote(pushPackageDir)+" && git rm --ignore-unmatch -r * && rm -rf *");
-    OS.system("cp -R "+OS.enquote(path)+"/* "+OS.enquote(pushPackageDir)+"/.");
+    if (OS.system(buildCmd([["cd", pushPackageDir], ["git", "checkout", "origin/"+branch]]))) {
+        if (OS.system(buildCmd([
+            ["cd", pushPackageDir],
+            ["git", "symbolic-ref", "HEAD", "refs/heads/"+branch],
+            ["rm", ".git/index"],
+            ["git", "clean", "-fdx"]
+        ])))
+            throw "pushPackage failed";
+    }
 
-    OS.system(buildCommandString([
+    if (OS.system("cd "+OS.enquote(pushPackageDir)+" && git rm --ignore-unmatch -r * && rm -rf *"))
+        throw "pushPackage failed";
+    if (OS.system("cp -R "+OS.enquote(path)+"/* "+OS.enquote(pushPackageDir)+"/."))
+        throw "pushPackage failed";
+
+    OS.system(buildCmd([
         ["cd", pushPackageDir],
         ["git", "add", "."],
-        ["git", "commit", "-m", "Pushed on " + new Date()],
-        ["git", "push", "origin", "master"]
+        ["git", "commit", "-m", "Pushed on " + new Date()]
     ]));
+    
+    if (OS.system(buildCmd([
+        ["cd", pushPackageDir],
+        ["git", "push", "origin", "HEAD:"+branch]
+    ])))
+        throw "pushPackage failed";
 }
 
-function buildCommandString(arrayOfCommands)
+function buildCmd(arrayOfCommands)
 {
     return arrayOfCommands.map(function(cmd) {
         return cmd.map(OS.enquote).join(" ");
     }).join(" && ");
+}
+
+function getShellConfigFile()
+{
+    var homeDir = SYSTEM.env["HOME"] + "/";
+    // use order outlined by http://hayne.net/MacDev/Notes/unixFAQ.html#shellStartup
+    var possibilities = [homeDir + ".bash_profile",
+                         homeDir + ".bash_login",
+                         homeDir + ".profile",
+                         homeDir + ".bashrc"];
+
+    for (var i = 0; i < possibilities.length; i++)
+    {
+        if (FILE.exists(possibilities[i]))
+            return possibilities[i];
+    }
 }

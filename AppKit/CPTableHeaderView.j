@@ -196,8 +196,9 @@ var _CPTableColumnHeaderViewStringValueKey = @"_CPTableColumnHeaderViewStringVal
     var tableRange = _tableView._tableColumnRanges[aColumnIndex],
         bounds = [self bounds];
 
-    bounds.origin.x = tableRange.location;
-    bounds.size.width = tableRange.length;
+    var rMinX = ROUND(tableRange.location);
+    bounds.origin.x = rMinX;
+    bounds.size.width = FLOOR(tableRange.length + tableRange.location - rMinX);
     
     return bounds;
 }
@@ -247,7 +248,7 @@ var _CPTableColumnHeaderViewStringValueKey = @"_CPTableColumnHeaderViewStringVal
         return;
 
     // 2 different tracking methods: one for resizing/stop-resizing, another one for selection/reordering
-    if ([_tableView allowsColumnResizing] && [_tableView columnAutoresizingStyle] & CPTableViewUniformColumnAutoresizingStyle
+    if ([_tableView allowsColumnResizing]
         && CGRectContainsPoint([self _cursorRectForColumn:resizedColumn], mouseLocation))
     {
         _resizedColumn = resizedColumn;
@@ -278,14 +279,7 @@ var _CPTableColumnHeaderViewStringValueKey = @"_CPTableColumnHeaderViewStringVal
         
         return;
     }
-/*
-    else if (type & CPLeftMouseDragged && [_tableView allowsColumnREordering])
-    {
-        // Start dragging here   
-        [[CPCursor closedHandCursor] set];
-        return;
-    }
-*/        
+
     [CPApp setTarget:self selector:@selector(trackMouseWithEvent:) forNextEventMatchingMask:CPLeftMouseDraggedMask | CPLeftMouseUpMask | CPLeftMouseDownMask untilDate:nil inMode:nil dequeue:YES];
 }
 
@@ -325,11 +319,11 @@ var _CPTableColumnHeaderViewStringValueKey = @"_CPTableColumnHeaderViewStringVal
             [[CPCursor resizeLeftCursor] set];
         else
         {
+            _tableView._lastColumnShouldSnap = NO;
             [tableColumn setWidth:newWidth];
             // FIXME: there has to be a better way to do this...
             // We should refactor the auto resizing crap.
             // We need to figure out the exact cocoa behavior here though. 
-            [_tableView resizeWithOldSuperviewSize:[_tableView bounds]];
             _lastLocation = location;
 
             [[CPCursor resizeLeftRightCursor] set];
@@ -343,6 +337,13 @@ var _CPTableColumnHeaderViewStringValueKey = @"_CPTableColumnHeaderViewStringVal
 
 - (void)_updateResizeCursor:(CPEvent)theEvent
 {
+    // never get stuck in resize cursor mode (FIXME take out when we turn on tracking rects)
+    if (![_tableView allowsColumnResizing] || ([theEvent type] === CPLeftMouseUp && ![[self window] acceptsMouseMovedEvents]))
+    {
+        [[CPCursor arrowCursor] set];
+        return;
+    }
+
     var mouseLocation = [self convertPoint:[theEvent locationInWindow] fromView:nil],    
         mouseOverLocation = CGPointMake(mouseLocation.x - 5, mouseLocation.y),
         overColumn = [self columnAtPoint:mouseOverLocation];
@@ -365,8 +366,8 @@ var _CPTableColumnHeaderViewStringValueKey = @"_CPTableColumnHeaderViewStringVal
 
 - (void)viewDidMoveToWindow
 {
-    if ([_tableView allowsColumnResizing])
-        [[self window] setAcceptsMouseMovedEvents:YES];
+    //if ([_tableView allowsColumnResizing])
+    //    [[self window] setAcceptsMouseMovedEvents:YES];
 }
 
 - (void)mouseEntered:(CPEvent)theEvent
@@ -412,6 +413,9 @@ var _CPTableColumnHeaderViewStringValueKey = @"_CPTableColumnHeaderViewStringVal
 
 - (void)drawRect:(CGRect)aRect
 {
+    if (!_tableView)
+        return;
+
     var context = [[CPGraphicsContext currentContext] graphicsPort],
         exposedColumnIndexes = [_tableView columnIndexesInRect:aRect],
         columnsArray = [],
