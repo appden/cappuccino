@@ -184,7 +184,7 @@ Preprocessor.Flags.IncludeTypeSignatures    = 1 << 1;
 Preprocessor.prototype.executable = function()
 {
     if (!this._executable)
-        this._executable = new Executable(this._buffer.toString(), this._dependencies);
+        this._executable = new Executable(this._buffer.toString(), this._dependencies, this._filePath);
 
     return this._executable;
 }
@@ -855,7 +855,7 @@ Preprocessor.prototype.preprocess = function(tokens, /*StringBuffer*/ aStringBuf
     
     // If we get this far and we're parsing an objj_msgSend (or array), then we have a problem.
     if (tuple)
-        new SyntaxError(this.error_message("*** Expected ']' - Unterminated message send or array."));
+        throw new SyntaxError(this.error_message("*** Expected ']' - Unterminated message send or array."));
 
     if (!aStringBuffer)
         return buffer;

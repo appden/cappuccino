@@ -849,9 +849,12 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
                 dataView = dataViewsInTableColumn[rowIndex];
             [dataView unsetThemeState:CPThemeStateHighlighted];
         }
-
-        var headerView = [_tableColumns[columnIndex] headerView];
-        [headerView unsetThemeState:CPThemeStateHighlighted];
+        
+        if (_headerView)
+        {
+            var headerView = [_tableColumns[columnIndex] headerView];
+            [headerView unsetThemeState:CPThemeStateHighlighted];
+        }
     }
 
     count = selectColumns.length;
@@ -867,9 +870,11 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
                 dataView = dataViewsInTableColumn[rowIndex];
             [dataView setThemeState:CPThemeStateHighlighted];
         }
-        
-        var headerView = [_tableColumns[columnIndex] headerView];
-        [headerView setThemeState:CPThemeStateHighlighted];
+        if (_headerView)
+        {
+            var headerView = [_tableColumns[columnIndex] headerView];
+            [headerView setThemeState:CPThemeStateHighlighted];
+        }
     }
 }
 
@@ -1788,12 +1793,15 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
 {   
     if (_currentHighlightedTableColumn == aTableColumn)
         return;
-        
-    if (_currentHighlightedTableColumn != nil)
-        [[_currentHighlightedTableColumn headerView] unsetThemeState:CPThemeStateHighlighted];
+    
+    if (_headerView)
+    {
+        if (_currentHighlightedTableColumn != nil)
+            [[_currentHighlightedTableColumn headerView] unsetThemeState:CPThemeStateHighlighted];
    
-    if (aTableColumn != nil)
-        [[aTableColumn headerView] setThemeState:CPThemeStateHighlighted];
+        if (aTableColumn != nil)
+            [[aTableColumn headerView] setThemeState:CPThemeStateHighlighted];
+    }
     
     _currentHighlightedTableColumn = aTableColumn;
 }
@@ -2145,7 +2153,7 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
             {
                 if (!isButton)
                     _editingCellIndex = undefined;
-                
+
                 if (isTextField)
                 {
                     [dataView setEditable:YES];
@@ -2153,7 +2161,7 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
                     [dataView setSelectable:YES];
                     [dataView selectText:nil]; // Doesn't seem to actually work (yet?).
                 }
-                
+
                 [dataView setTarget:self];
                 [dataView setAction:@selector(_commitDataViewObjectValue:)];
                 dataView.tableViewEditedColumnObj = tableColumn;
@@ -2618,7 +2626,7 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
 
     // if the table has drag support then we use mouseUp to select a single row.
     // otherwise it uses mouse down.
-    if (!(_implementedDataSourceMethods & CPTableViewDataSource_tableView_writeRowsWithIndexes_toPasteboard_))
+    if (row >=0 && !(_implementedDataSourceMethods & CPTableViewDataSource_tableView_writeRowsWithIndexes_toPasteboard_))
         [self _updateSelectionWithMouseAtRow:row];
 
     [[self window] makeFirstResponder:self];
@@ -2648,7 +2656,7 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
     // or we're dragging from selected rows and we haven't begun a drag session
     if(!_isSelectingSession && _implementedDataSourceMethods & CPTableViewDataSource_tableView_writeRowsWithIndexes_toPasteboard_)
     {
-        if ((ABS(_startTrackingPoint.x - aPoint.x) > 3 || (_verticalMotionCanDrag && ABS(_startTrackingPoint.y - aPoint.y) > 3)) || 
+        if (row >= 0 && (ABS(_startTrackingPoint.x - aPoint.x) > 3 || (_verticalMotionCanDrag && ABS(_startTrackingPoint.y - aPoint.y) > 3)) || 
             ([_selectedRowIndexes containsIndex:row]))
         {
             if ([_selectedRowIndexes containsIndex:row])
@@ -2706,8 +2714,8 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
     }
 
     _isSelectingSession = YES;
-    [self _updateSelectionWithMouseAtRow:row];
-    [self _updateSelectionWithMouseAtRow:[self rowAtPoint:aPoint]];
+    if(row >= 0)
+        [self _updateSelectionWithMouseAtRow:row];
 
     if ((_implementedDataSourceMethods & CPTableViewDataSource_tableView_setObjectValue_forTableColumn_row_)
         && !_trackingPointMovedOutOfClickSlop)
