@@ -7,7 +7,7 @@
  */
 
 @import <Foundation/CPObject.j>
-@import "AppKit/CPOutlineView.j"
+@import <AppKit/CPOutlineView.j>
 
 CPLogRegister(CPLogConsole);
 
@@ -192,18 +192,20 @@ CustomOutlineViewDragType = @"CustomOutlineViewDragType";
     
     
     _outlineView = [[CPOutlineView alloc] initWithFrame:[contentView bounds]];
-
-    [_outlineView setBackgroundColor:[CPColor greenColor]];
     
-    var column = [[CPTableColumn alloc] initWithIdentifier:@""];
+    var column = [[CPTableColumn alloc] initWithIdentifier:@"One"];
     [_outlineView addTableColumn:column];
     [_outlineView setOutlineTableColumn:column];
+    
+    [_outlineView addTableColumn:[[CPTableColumn alloc] initWithIdentifier:@"Two"]];
+
     [_outlineView registerForDraggedTypes:[CustomOutlineViewDragType]];
     
     [_outlineView setDataSource:self];
     [_outlineView setAllowsMultipleSelection:YES];
     [_outlineView expandItem:nil expandChildren:YES];
-    // [_outlineView setIntercellSpacing:CPSizeMake(0.0, 0.0)]
+	// [_outlineView setRowHeight:50.0];
+    // [_outlineView setIntercellSpacing:CPSizeMake(0.0, 10.0)]
     
     [scrollView setDocumentView:_outlineView];
     [theWindow setContentView:scrollView];
@@ -246,7 +248,10 @@ CustomOutlineViewDragType = @"CustomOutlineViewDragType";
 }
 
 - (id)outlineView:(CPOutlineView)anOutlineView objectValueForTableColumn:(CPTableColumn)theColumn byItem:(id)theItem
-{   
+{
+    // if ([theColumn identifier] === @"Two")
+    //  return @"Two";
+    
     if (theItem === nil)
         theItem = [self menu];
         
@@ -266,11 +271,13 @@ CustomOutlineViewDragType = @"CustomOutlineViewDragType";
 
 - (CPDragOperation)outlineView:(CPOutlineView)anOutlineView validateDrop:(id < CPDraggingInfo >)theInfo proposedItem:(id)theItem proposedChildIndex:(int)theIndex
 {
-    if (theItem === nil)
-        theItem = [self menu];
-        
     CPLog.debug(@"validate item: %@ at index: %i", theItem, theIndex);
-    
+	
+    if (theItem === nil)
+        [anOutlineView setDropItem:nil dropChildIndex:theIndex];
+        
+    [anOutlineView setDropItem:theItem dropChildIndex:theIndex];
+
     return CPDragOperationEvery;
 }
 
@@ -279,7 +286,7 @@ CustomOutlineViewDragType = @"CustomOutlineViewDragType";
     if (theItem === nil)
         theItem = [self menu];
     
-    CPLog.debug(@"drop item: %@ at index: %i", theItem, theIndex);
+    // CPLog.debug(@"drop item: %@ at index: %i", theItem, theIndex);
     
     var menuIndex = [_draggedItems count];
     while (menuIndex--)

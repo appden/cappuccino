@@ -52,10 +52,12 @@ var CPOutlineViewDataSource_outlineView_setObjectValue_forTableColumn_byItem_   
 
 
 var CPOutlineViewDelegate_outlineView_dataViewForTableColumn_item_                                  = 1 << 1,
-    CPOutlineViewDelegate_outlineView_shouldSelectItem_                                             = 1 << 2;
-    CPOutlineViewDelegate_outlineView_heightOfRowByItem_                                            = 1 << 3;
+    CPOutlineViewDelegate_outlineView_shouldSelectItem_                                             = 1 << 2,
+    CPOutlineViewDelegate_outlineView_heightOfRowByItem_                                            = 1 << 3,
+    CPOutlineViewDelegate_outlineView_willDisplayView_forTableColumn_item_                          = 1 << 4,
+    CPOutlineViewDelegate_outlineView_isGroupItem_                                                  = 1 << 5;
 
-
+CPOutlineViewDropOnItemIndex = -1;
 
 @implementation CPOutlineView : CPTableView
 {
@@ -77,6 +79,12 @@ var CPOutlineViewDelegate_outlineView_dataViewForTableColumn_item_              
     CPArray         _disclosureControlsForRows;
     CPData          _disclosureControlData;
     CPArray         _disclosureControlQueue;
+    
+    BOOL            _shouldRetargetItem;
+    id              _retargetedItem;
+    
+    BOOL            _shouldRetargetChildIndex;
+    CPInteger       _retargedChildIndex;
 }
 
 - (id)initWithFrame:(CGRect)aFrame
@@ -94,6 +102,12 @@ var CPOutlineViewDelegate_outlineView_dataViewForTableColumn_item_              
         _itemsForRows = [];
         _itemInfosForItems = { };
         _disclosureControlsForRows = [];
+
+        _retargetedItem = nil;
+        _shouldRetargetItem = NO;
+        
+        _retargedChildIndex = nil;
+        _shouldRetargetChildIndex = NO;
 
         [self setIndentationPerLevel:16.0];
         [self setIndentationMarkerFollowsDataView:YES];
@@ -204,6 +218,9 @@ var CPOutlineViewDelegate_outlineView_dataViewForTableColumn_item_              
         itemInfo = _rootItemInfo;
     else
         itemInfo = _itemInfosForItems[[anItem UID]];
+
+    if (!itemInfo)
+        return;
     
     itemInfo.isExpanded = YES;
     [self reloadItem:anItem reloadChildren:YES];
@@ -345,7 +362,13 @@ var CPOutlineViewDelegate_outlineView_dataViewForTableColumn_item_              
     if (!itemInfo)
         return nil;
 
-    return itemInfo.parent;
+    var parent = itemInfo.parent;
+    
+    // Check if the parent is the root item because we never return the actual root item
+    if (itemInfo[[parent UID]] === _rootItemInfo)
+        parent = nil;
+
+    return parent;
 }
 
 - (CGRect)frameOfOutlineDataViewAtColumn:(CPInteger)aColumn row:(CPInteger)aRow
@@ -444,6 +467,12 @@ var CPOutlineViewDelegate_outlineView_dataViewForTableColumn_item_              
     if ([_outlineViewDelegate respondsToSelector:@selector(outlineView:heightOfRowByItem:)])
         _implementedOutlineViewDelegateMethods |= CPOutlineViewDelegate_outlineView_heightOfRowByItem_;
 
+    if ([_outlineViewDelegate respondsToSelector:@selector(outlineView:willDisplayView:forTableColumn:item:)])
+        _implementedOutlineViewDelegateMethods |= CPOutlineViewDelegate_outlineView_willDisplayView_forTableColumn_item_;
+
+    if ([_outlineViewDelegate respondsToSelector:@selector(outlineView:isGroupItem:)])
+         _implementedOutlineViewDelegateMethods |= CPOutlineViewDelegate_outlineView_isGroupItem_;
+
     if ([_outlineViewDelegate respondsToSelector:@selector(outlineViewColumnDidMove:)])
         [defaultCenter
             addObserver:_outlineViewDelegate
@@ -503,41 +532,52 @@ var CPOutlineViewDelegate_outlineView_dataViewForTableColumn_item_              
     return [super frameOfDataViewAtColumn:aColumn row:aRow];
 }
 
-- (id)_parentItemForRow:(int)theLowerRow andUpperRow:(int)theUpperRow atMouseOffset:(float)theXOffset
+- (void)setDropItem:(id)theItem dropChildIndex:(int)theIndex
 {
-    var level = [self levelForRow:theLowerRow],
-        upperLevel = [self levelForRow:theUpperRow];
+    _retargetedItem = theItem;
+    _shouldRetargetItem = YES;
     
-    // If the row above us has a higher level the item can be added to multiple parent items
-    // Determine which one by looping through all possible parents and return the first one
-    // which indentation level is larger than the current x offset
-    if (upperLevel > level)
-    {
-        while (level !== 0)
-        {
-            level = [self levelForRow:theUpperRow];
-            
-            // See if this item's indentation level matches the mouse offset
-            if (theXOffset > (level + 1) * [self indentationPerLevel])
-                return [self parentForItem:[self itemAtRow:theUpperRow]];
-            
-            // Check the next parent
-            theUpperRow = [self rowForItem:[self parentForItem:[self itemAtRow:theUpperRow]]];
-        }
-    }
-    
-    return [self parentForItem:[self itemAtRow:theLowerRow]];
+    _retargedChildIndex = theIndex;
+    _shouldRetargetChildIndex = YES;
 }
 
-- (CPRect)_rectForDropHighlightViewBetweenUpperRow:(int)theUpperRowIndex andLowerRow:(int)theLowerRowIndex offset:(float)theXOffset
+- (id)_parentItemForUpperRow:(int)theUpperRowIndex andLowerRow:(int)theLowerRowIndex atMouseOffset:(CPPoint)theOffset
 {
-    // Call super and the x to reflect the current indentation level
-    var rect = [super _rectForDropHighlightViewBetweenUpperRow:theUpperRowIndex andLowerRow:theLowerRowIndex offset:theXOffset],
-        parentItem = [self _parentItemForRow:theLowerRowIndex andUpperRow:theUpperRowIndex atMouseOffset:theXOffset],
+    if (_shouldRetargetItem)
+        return _retargetedItem;
+    
+    var lowerLevel = [self levelForRow:theLowerRowIndex]
+        upperItem = [self itemAtRow:theUpperRowIndex];
+        upperLevel = [self levelForItem:upperItem];
+
+    // If the row above us has a higher level the item can be added to multiple parent items
+    // Determine which one by looping through all possible parents and return the first
+    // of which the indentation level is larger than the current x offset
+    while (upperLevel > lowerLevel)
+    {
+        upperLevel = [self levelForItem:upperItem];
+
+        // See if this item's indentation level matches the mouse offset
+        if (theOffset.x > (upperLevel + 1) * [self indentationPerLevel])
+            return [self parentForItem:upperItem];
+
+        // Check the next parent
+        upperItem = [self parentForItem:upperItem];
+    }
+    
+    return [self parentForItem:[self itemAtRow:theLowerRowIndex]];
+}
+
+- (CPRect)_rectForDropHighlightViewBetweenUpperRow:(int)theUpperRowIndex andLowerRow:(int)theLowerRowIndex offset:(CPPoint)theOffset
+{
+    // Call super and the update x to reflect the current indentation level
+    var rect = [super _rectForDropHighlightViewBetweenUpperRow:theUpperRowIndex andLowerRow:theLowerRowIndex offset:theOffset],
+        parentItem = [self _parentItemForUpperRow:theUpperRowIndex andLowerRow:theLowerRowIndex atMouseOffset:theOffset],
         level = [self levelForItem:parentItem];
     
-    rect.origin.x = (level + 1) * [self indentationPerLevel];
-   
+    rect.origin.x = (level + 1) * [self indentationPerLevel];   
+    rect.size.width -= rect.origin.x; // This assumes that the x returned by super is zero
+    
     return rect;
 }
 
@@ -857,16 +897,19 @@ var _loadItemInfoForItem = function(/*CPOutlineView*/ anOutlineView, /*id*/ anIt
     return [_outlineView._outlineViewDataSource outlineView:_outlineView writeItems:items toPasteboard:thePasteboard];
 }
 
-- (int)_childIndexForDropOperation:(CPTableViewDropOperation)theDropOperation row:(int)theRow offset:(CPPoint)theXOffset
+- (int)_childIndexForDropOperation:(CPTableViewDropOperation)theDropOperation row:(int)theRow offset:(CPPoint)theOffset
 {
+    if (_outlineView._shouldRetargetChildIndex)
+        return _outlineView._retargedChildIndex;
+    
     var childIndex = CPNotFound;
     
     if (theDropOperation === CPTableViewDropAbove)
     {
-        var parentItem = [_outlineView _parentItemForRow:theRow andUpperRow:theRow - 1 atMouseOffset:theXOffset],
+        var parentItem = [_outlineView _parentItemForUpperRow:theRow - 1 andLowerRow:theRow atMouseOffset:theOffset],
             itemInfo = (parentItem !== nil) ? _outlineView._itemInfosForItems[[parentItem UID]] : _outlineView._rootItemInfo,
             children = itemInfo.children;
-            
+        
         childIndex = [children indexOfObject:[_outlineView itemAtRow:theRow]];
 
         if (childIndex === CPNotFound)
@@ -874,15 +917,14 @@ var _loadItemInfoForItem = function(/*CPOutlineView*/ anOutlineView, /*id*/ anIt
     }
     else if (theDropOperation === CPTableViewDropOn)
         childIndex = -1;
-    
+
     return childIndex;
 }
 
-
-- (void)_parentItemForDropOperation:(CPTableViewDropOperation)theDropOperation row:(int)theRow offset:(CPPoint)theXOffset
+- (void)_parentItemForDropOperation:(CPTableViewDropOperation)theDropOperation row:(int)theRow offset:(CPPoint)theOffset
 {
     if (theDropOperation === CPTableViewDropAbove)
-        return [_outlineView _parentItemForRow:theRow andUpperRow:theRow - 1 atMouseOffset:theXOffset]       
+        return [_outlineView _parentItemForUpperRow:theRow - 1 andLowerRow:theRow atMouseOffset:theOffset]       
             
     return [_outlineView itemAtRow:theRow];
 }
@@ -893,10 +935,17 @@ var _loadItemInfoForItem = function(/*CPOutlineView*/ anOutlineView, /*id*/ anIt
     if (!(_outlineView._implementedOutlineViewDataSourceMethods & CPOutlineViewDataSource_outlineView_validateDrop_proposedItem_proposedChildIndex_))
         return CPDragOperationNone;
 
+    // Make sure the retargeted item and index are reset
+    _outlineView._retargetedItem = nil;
+    _outlineView._shouldRetargetItem = NO;
+
+    _outlineView._retargedChildIndex = nil;
+    _outlineView._shouldRetargetChildIndex = NO;
+
     var location = [_outlineView convertPoint:[theInfo draggingLocation] fromView:nil],
-        childIndex = [self _childIndexForDropOperation:theOperation row:theRow offset:location.x],
-        parentItem = [self _parentItemForDropOperation:theOperation row:theRow offset:location.x];
-            
+        parentItem = [self _parentItemForDropOperation:theOperation row:theRow offset:location];
+        childIndex = [self _childIndexForDropOperation:theOperation row:theRow offset:location];
+
     return [_outlineView._outlineViewDataSource outlineView:_outlineView validateDrop:theInfo proposedItem:parentItem proposedChildIndex:childIndex];
 }
 
@@ -905,10 +954,16 @@ var _loadItemInfoForItem = function(/*CPOutlineView*/ anOutlineView, /*id*/ anIt
     if (!(_outlineView._implementedOutlineViewDataSourceMethods & CPOutlineViewDataSource_outlineView_acceptDrop_item_childIndex_))
         return NO;
 
-    var location = [_outlineView convertPoint:[theInfo draggingLocation] fromView:nil],
-        childIndex = [self _childIndexForDropOperation:theOperation row:theRow offset:location.x],
-        parentItem = [self _parentItemForDropOperation:theOperation row:theRow offset:location.x];
+     var location = [_outlineView convertPoint:[theInfo draggingLocation] fromView:nil],
+        parentItem = [self _parentItemForDropOperation:theOperation row:theRow offset:location];
+        childIndex = [self _childIndexForDropOperation:theOperation row:theRow offset:location];
     
+    _outlineView._retargetedItem = nil;
+    _outlineView._shouldRetargetItem = NO;
+
+    _outlineView._retargedChildIndex = nil;
+    _outlineView._shouldRetargetChildIndex = NO;
+
     return [_outlineView._outlineViewDataSource outlineView:_outlineView acceptDrop:theInfo item:parentItem childIndex:childIndex];
 }
 
@@ -958,6 +1013,23 @@ var _loadItemInfoForItem = function(/*CPOutlineView*/ anOutlineView, /*id*/ anIt
         return [_outlineView._outlineViewDelegate outlineView:_outlineView heightOfRowByItem:[_outlineView itemAtRow:theRow]];
 
     return [theTableView rowHeight];
+}
+
+- (void)tableView:(CPTableView)aTableView willDisplayView:(id)aView forTableColumn:(CPTableColumn)aTableColumn row:(int)aRowIndex
+{
+    if ((_outlineView._implementedOutlineViewDelegateMethods & CPOutlineViewDelegate_outlineView_willDisplayView_forTableColumn_item_))
+    {
+        var item = [_outlineView itemAtRow:aRowIndex];
+        [_outlineView._outlineViewDelegate outlineView:_outlineView willDisplayView:aView forTableColumn:aTableColumn item:item];
+    }
+}
+
+- (BOOL)tableView:(CPTableView)aTableView isGroupRow:(int)row
+{
+    if ((_outlineView._implementedOutlineViewDelegateMethods & CPOutlineViewDelegate_outlineView_isGroupItem_))
+        return [_outlineView._outlineViewDelegate outlineView:_outlineView isGroupItem:[_outlineView itemAtRow:theRow]];
+
+    return NO;
 }
 
 @end

@@ -878,6 +878,11 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
     }
 }
 
+- (int)selectedColumn
+{
+    [_selectedColumnIndexes lastIndex];
+}
+
 - (CPIndexSet)selectedColumnIndexes
 {
     return _selectedColumnIndexes;
@@ -2664,16 +2669,16 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
             else
                 _draggedRowIndexes = [CPIndexSet indexSetWithIndex:row];
 
+
             //ask the datasource for the data
             var pboard = [CPPasteboard pasteboardWithName:CPDragPboard];
 
-            if ([self canDragRowsWithIndexes:_draggedRowIndexes atPoint:aPoint] && 
-                [_dataSource tableView:self writeRowsWithIndexes:_draggedRowIndexes toPasteboard:pboard])
+            if ([self canDragRowsWithIndexes:_draggedRowIndexes atPoint:aPoint] && [_dataSource tableView:self writeRowsWithIndexes:_draggedRowIndexes toPasteboard:pboard])
             {
                 var currentEvent = [CPApp currentEvent],
                     offset = CPPointMakeZero(),
                     tableColumns = [_tableColumns objectsAtIndexes:_exposedColumns];
-
+        
                 // We deviate from the default Cocoa implementation here by asking for a view in stead of an image
                 // We support both, but the view prefered over the image because we can mimic the rows we are dragging
                 // by re-creating the data views for the dragged rows
@@ -2681,33 +2686,27 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
                                                tableColumns:tableColumns 
                                                       event:currentEvent 
                                                      offset:offset];
-
+    
                 if (!view)
                 {
                     var image = [self dragImageForRowsWithIndexes:_draggedRowIndexes 
                                                      tableColumns:tableColumns 
                                                             event:currentEvent 
                                                            offset:offset];
-
                     view = [[CPImageView alloc] initWithFrame:CPMakeRect(0, 0, [image size].width, [image size].height)];
                     [view setImage:image];
                 }
-
-                var bounds = [view bounds],
-                    viewLocation = CPPointMake(aPoint.x - CGRectGetWidth(bounds)/2 + offset.x, aPoint.y - CGRectGetHeight(bounds)/2 + offset.y);
-
-                [self dragView:view 
-                            at:viewLocation 
-                        offset:CPPointMakeZero() 
-                         event:[CPApp currentEvent] 
-                    pasteboard:pboard 
-                        source:self 
-                     slideBack:YES];
-
+    
+                var bounds = [view bounds];
+                var viewLocation = CPPointMake(aPoint.x - CGRectGetWidth(bounds)/2 + offset.x, aPoint.y - CGRectGetHeight(bounds)/2 + offset.y);
+                [self dragView:view at:viewLocation offset:CPPointMakeZero() event:[CPApp currentEvent] pasteboard:pboard source:self slideBack:YES];
                 _startTrackingPoint = nil;
-
+    
                 return NO;
             }
+            
+            // The delegate disallowed the drag so clear the dragged row indexes
+            _draggedRowIndexes = [CPIndexSet indexSet];
         }
         else if (ABS(_startTrackingPoint.x - aPoint.x) < 5 && ABS(_startTrackingPoint.y - aPoint.y) < 5)
             return YES;
@@ -2803,15 +2802,15 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
     var location = [self convertPoint:[sender draggingLocation] fromView:nil],
         dropOperation = [self _proposedDropOperationAtPoint:location],
         row = [self _proposedRowAtPoint:location];
-    
+
     if(_retargetedDropRow !== nil)
         row = _retargetedDropRow;
     
     var draggedTypes = [self registeredDraggedTypes], 
         count = [draggedTypes count],
-        i;
+        i = 0;
         
-    for (i = 0; i < count; i++) 
+    for (; i < count; i++) 
     { 
         if ([[[sender draggingPasteboard] types] containsObject:[draggedTypes objectAtIndex: i]]) 
             return [self _validateDrop:sender proposedRow:row proposedDropOperation:dropOperation]; 
@@ -2859,15 +2858,18 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
     if(_retargetedDropOperation !== nil) 
         return _retargetedDropOperation;
 
-    var row = [self rowAtPoint:theDragPoint],
+    var row = [self _proposedRowAtPoint:theDragPoint],
         rowRect = [self rectOfRow:row];
-        
+
     // If there is no (the default) or to little inter cell spacing we create some room for the CPTableViewDropAbove indicator
     // This probably doesn't work if the row height is smaller than or around 5.0
     if ([self intercellSpacing].height < 5.0)
-        rowRect = CPRectInset(rowRect, 0.0, 5.0 - [self intercellSpacing].height);
-        
-    if (CGRectContainsPoint(rowRect, theDragPoint)) 
+		rowRect = CPRectInset(rowRect, 0.0, 5.0 - [self intercellSpacing].height);
+    
+	// If the altered row rect contains the drag point we show the drop on
+	// We don't show the drop on indicator if we are dragging below the last row 
+	// in that case we always want to show the drop above indicator
+    if (CGRectContainsPoint(rowRect, theDragPoint) && row < _numberOfRows) 
         return CPTableViewDropOn;
         
     return CPTableViewDropAbove;
@@ -2903,12 +2905,12 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
     return [self rectOfRow:theRowIndex];
 }
 
-- (CPRect)_rectForDropHighlightViewBetweenUpperRow:(int)theUpperRowIndex andLowerRow:(int)theLowerRowIndex offset:(float)theXOffset
+- (CPRect)_rectForDropHighlightViewBetweenUpperRow:(int)theUpperRowIndex andLowerRow:(int)theLowerRowIndex offset:(CPPoint)theOffset
 {
     if (theLowerRowIndex > [self numberOfRows])
         theLowerRowIndex = [self numberOfRows];
-    
-    return [self rectOfRow:theLowerRowIndex];
+
+	return [self rectOfRow:theLowerRowIndex];
 }
 
 - (CPDragOperation)draggingUpdated:(id)sender
@@ -2920,20 +2922,13 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
     var row = [self _proposedRowAtPoint:location],
         dragOperation = [self _validateDrop:sender proposedRow:row proposedDropOperation:dropOperation];
         exposedClipRect = [self exposedClipRect];
-    
+	
     if(_retargetedDropRow !== nil)
         row = _retargetedDropRow;
+
     
-    //if the user forces -1 then we should highlight the whole tableview
-    // var rowRect = CPRectMakeZero();
-    // if(_retargetedDropRow === -1 || row === -1)
-    //     rowRect = [self exposedClipRect];
-    // else
-    //     rowRect = [self rectOfRow:row];
-    // 
-    //     visibleWidth = _CGRectGetWidth(exposedClipRect);
-    // 
-    // rowRect = _CGRectMake(_CGRectGetMinX(exposedClipRect), rowRect.origin.y, visibleWidth, rowRect.size.height);
+    if (dropOperation === CPTableViewDropOn && row >= [self numberOfRows])
+        row = [self numberOfRows] - 1;
 
     var rect = CPRectMakeZero();
     
@@ -2941,7 +2936,7 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
         rect = exposedClipRect;
         
     else if (dropOperation === CPTableViewDropAbove)
-        rect = [self _rectForDropHighlightViewBetweenUpperRow:row - 1 andLowerRow:row offset:location.x];
+        rect = [self _rectForDropHighlightViewBetweenUpperRow:row - 1 andLowerRow:row offset:location];
         
     else 
         rect = [self _rectForDropHighlightViewOnRow:row];
@@ -3138,10 +3133,10 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
     var anEvent = [CPApp currentEvent];
     if([[self selectedRowIndexes] count] > 0)
     {
-       var extend = NO;
+        var extend = NO;
 
-       if(([anEvent modifierFlags] & CPShiftKeyMask) && _allowsMultipleSelection)
-           extend = YES;
+        if(([anEvent modifierFlags] & CPShiftKeyMask) && _allowsMultipleSelection)
+            extend = YES;
 
         var i = [[self selectedRowIndexes] lastIndex];
         if(i<[self numberOfRows] - 1)
@@ -3400,13 +3395,16 @@ var CPTableViewDataSourceKey                = @"CPTableViewDataSourceKey",
     CGContextSetLineWidth(context, 3);
     
     if (currentRow === -1)
+    {
         CGContextStrokeRect(context, [self bounds]);
+    }
     
-    else if(dropOperation === CPTableViewDropOn)
+    else if (dropOperation === CPTableViewDropOn)
     {
         //if row is selected don't fill and stroke white
-        var selectedRows = [tableView selectedRowIndexes];
-        var newRect = _CGRectMake(aRect.origin.x + 2, aRect.origin.y + 2, aRect.size.width - 4, aRect.size.height - 5);
+        var selectedRows = [tableView selectedRowIndexes],
+            newRect = _CGRectMake(aRect.origin.x + 2, aRect.origin.y + 2, aRect.size.width - 4, aRect.size.height - 5);
+
         if([selectedRows containsIndex:currentRow])
         {
             CGContextSetLineWidth(context, 2);
@@ -3454,6 +3452,7 @@ var CPTableViewDataSourceKey                = @"CPTableViewDataSourceKey",
         CGContextStrokePath(context);
         //CGContextStrokeLineSegments(context, [aRect.origin.x + 8,  aRect.origin.y + 8, 300 , aRect.origin.y + 8]);
     }
+        
 
 }
 @end
