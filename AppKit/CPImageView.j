@@ -381,7 +381,6 @@ var LEFT_SHADOW_INSET       = 3.0,
 @end
 
 var CPImageViewImageKey         = @"CPImageViewImageKey",
-    CPImageViewImageScalingKey  = @"CPImageViewImageScalingKey",
     CPImageViewHasShadowKey     = @"CPImageViewHasShadowKey",
     CPImageViewIsEditableKey    = @"CPImageViewIsEditableKey";
 
@@ -416,9 +415,7 @@ var CPImageViewImageKey         = @"CPImageViewImageKey",
 #endif
 
         [self setHasShadow:[aCoder decodeBoolForKey:CPImageViewHasShadowKey]];
-        
-        if ([aCoder decodeBoolForKey:CPImageViewIsEditableKey] || NO)
-            [self setEditable:YES];
+        [self setEditable:[aCoder decodeBoolForKey:CPImageViewIsEditableKey]];
 
         [self setNeedsLayout];
         [self setNeedsDisplay:YES];
@@ -450,9 +447,7 @@ var CPImageViewImageKey         = @"CPImageViewImageKey",
         _subviews = actualSubviews;
     
     [aCoder encodeBool:_hasShadow forKey:CPImageViewHasShadowKey];
-
-    if (_isEditable)
-        [aCoder encodeBool:_isEditable forKey:CPImageViewIsEditableKey];
+    [aCoder encodeBool:_isEditable forKey:CPImageViewIsEditableKey];
 }
 
 @end
