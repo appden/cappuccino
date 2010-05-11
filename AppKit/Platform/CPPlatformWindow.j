@@ -41,11 +41,13 @@ var PrimaryPlatformWindow   = NULL;
 
     DOMElement      _DOMBodyElement;
     DOMElement      _DOMFocusElement;
+    DOMElement      _DOMEventGuard;
 
     CPArray         _windowLevels;
     CPDictionary    _windowLayers;
 
     BOOL            _mouseIsDown;
+    BOOL            _mouseDownIsRightClick;
     CPWindow        _mouseDownWindow;
     CPTimeInterval  _lastMouseUp;
     CPTimeInterval  _lastMouseDown;

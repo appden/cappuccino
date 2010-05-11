@@ -31,6 +31,7 @@
 @import "CPCibLoading.j"
 @import "CPPlatform.j"
 
+#include "Platform/Platform.h"
 
 var CPMainCibFile               = @"CPMainCibFile",
     CPMainCibFileHumanFriendly  = @"Main cib file base name";
@@ -53,7 +54,7 @@ CPRunStoppedResponse    = -1000;
 CPRunAbortedResponse    = -1001;
 CPRunContinuesResponse  = -1002;
 
-/*! 
+/*!
     @ingroup appkit
     @class CPApplication
 
@@ -61,7 +62,7 @@ CPRunContinuesResponse  = -1002;
     Every GUI application has exactly one instance of CPApplication (or of a custom subclass of
     CPApplication). Your program's main() function can create that instance by calling the
     \c CPApplicationMain function. A simple example looks like this:
-    
+
     <pre>
     function main(args, namedArgs)
     {
@@ -81,25 +82,25 @@ CPRunContinuesResponse  = -1002;
 @implementation CPApplication : CPResponder
 {
     CPArray                 _eventListeners;
-    
+
     CPEvent                 _currentEvent;
-    
+
     CPArray                 _windows;
     CPWindow                _keyWindow;
     CPWindow                _mainWindow;
     CPWindow                _previousKeyWindow;
     CPWindow                _previousMainWindow;
-    
+
     CPMenu                  _mainMenu;
     CPDocumentController    _documentController;
-    
+
     CPModalSession          _currentSession;
-    
+
     //
     id                      _delegate;
     BOOL                    _finishedLaunching;
     BOOL                    _isActive;
-    
+
     CPDictionary            _namedArgs;
     CPArray                 _args;
     CPString                _fullArgsString;
@@ -118,7 +119,7 @@ CPRunContinuesResponse  = -1002;
 {
     if (!CPApp)
         CPApp = [[CPApplication alloc] init];
-    
+
     return CPApp;
 }
 
@@ -130,73 +131,18 @@ CPRunContinuesResponse  = -1002;
 - (id)init
 {
     self = [super init];
-    
+
+    CPApp = self;
+
     if (self)
     {
         _eventListeners = [];
-        
+
         _windows = [];
-        
+
         [_windows addObject:nil];
-    
-        // FIXME: This should be read from the cib.
-        _mainMenu = [[CPMenu alloc] initWithTitle:@"MainMenu"];
-        
-        // FIXME: We should implement autoenabling.
-        [_mainMenu setAutoenablesItems:NO];
-
-        var bundle = [CPBundle bundleForClass:[CPApplication class]],
-            newMenuItem = [[CPMenuItem alloc] initWithTitle:@"New" action:@selector(newDocument:) keyEquivalent:@"N"];
-
-        [newMenuItem setImage:[[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"CPApplication/New.png"] size:CGSizeMake(16.0, 16.0)]];
-        [newMenuItem setAlternateImage:[[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"CPApplication/NewHighlighted.png"] size:CGSizeMake(16.0, 16.0)]];
-
-        [_mainMenu addItem:newMenuItem];
-        
-        var openMenuItem = [[CPMenuItem alloc] initWithTitle:@"Open" action:@selector(openDocument:) keyEquivalent:@"O"];
-        
-        [openMenuItem setImage:[[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"CPApplication/Open.png"] size:CGSizeMake(16.0, 16.0)]];
-        [openMenuItem setAlternateImage:[[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"CPApplication/OpenHighlighted.png"] size:CGSizeMake(16.0, 16.0)]];
-        
-        [_mainMenu addItem:openMenuItem];
-        
-        var saveMenu = [[CPMenu alloc] initWithTitle:@"Save"],
-            saveMenuItem = [[CPMenuItem alloc] initWithTitle:@"Save" action:@selector(saveDocument:) keyEquivalent:nil];
-        
-        [saveMenuItem setImage:[[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"CPApplication/Save.png"] size:CGSizeMake(16.0, 16.0)]];
-        [saveMenuItem setAlternateImage:[[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"CPApplication/SaveHighlighted.png"] size:CGSizeMake(16.0, 16.0)]];        
-        
-        [saveMenu addItem:[[CPMenuItem alloc] initWithTitle:@"Save" action:@selector(saveDocument:) keyEquivalent:@"S"]];
-        [saveMenu addItem:[[CPMenuItem alloc] initWithTitle:@"Save As" action:@selector(saveDocumentAs:) keyEquivalent:nil]];
-        
-        [saveMenuItem setSubmenu:saveMenu];
-        
-        [_mainMenu addItem:saveMenuItem];
-        
-        var editMenuItem = [[CPMenuItem alloc] initWithTitle:@"Edit" action:nil keyEquivalent:nil],
-            editMenu = [[CPMenu alloc] initWithTitle:@"Edit"],
-            
-            undoMenuItem = [[CPMenuItem alloc] initWithTitle:@"Undo" action:@selector(undo:) keyEquivalent:CPUndoKeyEquivalent],
-            redoMenuItem = [[CPMenuItem alloc] initWithTitle:@"Redo" action:@selector(redo:) keyEquivalent:CPRedoKeyEquivalent];
-
-        [undoMenuItem setKeyEquivalentModifierMask:CPUndoKeyEquivalentModifierMask];        
-        [redoMenuItem setKeyEquivalentModifierMask:CPRedoKeyEquivalentModifierMask];
-        
-        [editMenu addItem:undoMenuItem];
-        [editMenu addItem:redoMenuItem];
-        
-        [editMenu addItem:[[CPMenuItem alloc] initWithTitle:@"Cut" action:@selector(cut:) keyEquivalent:@"X"]],
-        [editMenu addItem:[[CPMenuItem alloc] initWithTitle:@"Copy" action:@selector(copy:) keyEquivalent:@"C"]],
-        [editMenu addItem:[[CPMenuItem alloc] initWithTitle:@"Paste" action:@selector(paste:) keyEquivalent:@"V"]];
-    
-        [editMenuItem setSubmenu:editMenu];
-        [editMenuItem setHidden:YES];
-        
-        [_mainMenu addItem:editMenuItem];
-        
-        [_mainMenu addItem:[CPMenuItem separatorItem]];
     }
-    
+
     return self;
 }
 
@@ -212,85 +158,46 @@ CPRunContinuesResponse  = -1002;
 {
     if (_delegate == aDelegate)
         return;
-    
-    var defaultCenter = [CPNotificationCenter defaultCenter];
-    
+
+    var defaultCenter = [CPNotificationCenter defaultCenter],
+        delegateNotifications =
+        [
+            CPApplicationWillFinishLaunchingNotification, @selector(applicationWillFinishLaunching:),
+            CPApplicationDidFinishLaunchingNotification, @selector(applicationDidFinishLaunching:),
+            CPApplicationWillBecomeActiveNotification, @selector(applicationWillBecomeActive:),
+            CPApplicationDidBecomeActiveNotification, @selector(applicationDidBecomeActive:),
+            CPApplicationWillResignActiveNotification, @selector(applicationWillResignActive:),
+            CPApplicationDidResignActiveNotification, @selector(applicationDidResignActive:),
+            CPApplicationWillTerminateNotification, @selector(applicationWillTerminate:)
+        ],
+        count = [delegateNotifications count];
+
     if (_delegate)
     {
-        [defaultCenter
-            removeObserver:_delegate
-                      name:CPApplicationWillFinishLaunchingNotification
-                    object:self];
+        var index = 0;
 
-        [defaultCenter
-            removeObserver:_delegate
-                      name:CPApplicationDidFinishLaunchingNotification
-                    object:self];
+        for (; index < count; index += 2)
+        {
+            var notificationName = delegateNotifications[index],
+                selector = delegateNotifications[index + 1];
 
-        [defaultCenter
-            removeObserver:_delegate
-                      name:CPApplicationWillBecomeActiveNotification
-                    object:self];
-
-        [defaultCenter
-            removeObserver:_delegate
-                      name:CPApplicationDidBecomeActiveNotification
-                    object:self];
-
-        [defaultCenter
-            removeObserver:_delegate
-                      name:CPApplicationWillResignActiveNotification
-                    object:self];
-
-        [defaultCenter
-            removeObserver:_delegate
-                      name:CPApplicationDidResignActiveNotification
-                    object:self];
+            if ([_delegate respondsToSelector:selector])
+                [defaultCenter removeObserver:_delegate name:notificationName object:self];
+        }
     }
-    
+
     _delegate = aDelegate;
-    
-    if ([_delegate respondsToSelector:@selector(applicationWillFinishLaunching:)])
-        [defaultCenter
-            addObserver:_delegate
-               selector:@selector(applicationWillFinishLaunching:)
-                   name:CPApplicationWillFinishLaunchingNotification
-                 object:self];
-    
-    if ([_delegate respondsToSelector:@selector(applicationDidFinishLaunching:)])
-        [defaultCenter
-            addObserver:_delegate
-               selector:@selector(applicationDidFinishLaunching:)
-                   name:CPApplicationDidFinishLaunchingNotification
-                 object:self];
 
-    if ([_delegate respondsToSelector:@selector(applicationWillBecomeActive:)])
-        [defaultCenter
-            addObserver:_delegate
-               selector:@selector(applicationWillBecomeActive:)
-                   name:CPApplicationWillBecomeActiveNotification
-                 object:self];
+    var index = 0;
 
-    if ([_delegate respondsToSelector:@selector(applicationDidBecomeActive:)])
-        [defaultCenter
-            addObserver:_delegate
-               selector:@selector(applicationDidBecomeActive:)
-                   name:CPApplicationDidBecomeActiveNotification
-                 object:self];
+    for (; index < count; index += 2)
+    {
+        var notificationName = delegateNotifications[index],
+            selector = delegateNotifications[index + 1];
 
-    if ([_delegate respondsToSelector:@selector(applicationWillResignActive:)])
-        [defaultCenter
-            addObserver:_delegate
-               selector:@selector(applicationWillResignActive:)
-                   name:CPApplicationWillResignActiveNotification
-                 object:self];
-
-    if ([_delegate respondsToSelector:@selector(applicationDidResignActive:)])
-        [defaultCenter
-            addObserver:_delegate
-               selector:@selector(applicationDidResignActive:)
-                   name:CPApplicationDidResignActiveNotification
-                 object:self];
+        if ([_delegate respondsToSelector:selector])
+            [defaultCenter addObserver:_delegate selector:selector name:notificationName object:self];
+    }
 }
 
 /*!
@@ -316,28 +223,28 @@ CPRunContinuesResponse  = -1002;
 
     // We also want to set the default cursor on the body, so that buttons and things don't have an iBeam
     [[CPCursor arrowCursor] set];
-    
+
     var bundle = [CPBundle mainBundle],
         types = [bundle objectForInfoDictionaryKey:@"CPBundleDocumentTypes"];
-        
+
     if ([types count] > 0)
         _documentController = [CPDocumentController sharedDocumentController];
-        
+
     var delegateClassName = [bundle objectForInfoDictionaryKey:@"CPApplicationDelegateClass"];
-    
+
     if (delegateClassName)
     {
         var delegateClass = objj_getClass(delegateClassName);
-        
+
         if (delegateClass)
             if ([_documentController class] == delegateClass)
                 [self setDelegate:_documentController];
             else
                 [self setDelegate:[[delegateClass alloc] init]];
     }
-    
+
     var defaultCenter = [CPNotificationCenter defaultCenter];
-    
+
     [defaultCenter
         postNotificationName:CPApplicationWillFinishLaunchingNotification
         object:self];
@@ -369,6 +276,10 @@ CPRunContinuesResponse  = -1002;
 
 - (void)terminate:(id)aSender
 {
+    [[CPNotificationCenter defaultCenter]
+        postNotificationName:CPApplicationWillTerminateNotification
+                      object:self];
+
     if (![CPPlatform isBrowser])
     {
         [[CPDocumentController sharedDocumentController] closeAllDocumentsWithDelegate:self
@@ -422,14 +333,14 @@ CPRunContinuesResponse  = -1002;
             versionLabel = [contentView viewWithTag:3],
             copyrightLabel = [contentView viewWithTag:4],
             standardPath = [[CPBundle bundleForClass:[self class]] pathForResource:@"standardApplicationIcon.png"];
-    
+
         // FIXME move this into the CIB eventually
         [applicationLabel setFont:[CPFont boldSystemFontOfSize:14.0]];
         [applicationLabel setAlignment:CPCenterTextAlignment];
         [versionLabel setAlignment:CPCenterTextAlignment];
         [copyrightLabel setAlignment:CPCenterTextAlignment];
 
-        [imageView setImage:applicationIcon || [[CPImage alloc] initWithContentsOfFile:standardPath 
+        [imageView setImage:applicationIcon || [[CPImage alloc] initWithContentsOfFile:standardPath
                                                                                   size:CGSizeMake(256, 256)]];
 
         [applicationLabel setStringValue:applicationTitle || ""];
@@ -533,10 +444,10 @@ CPRunContinuesResponse  = -1002;
         return;
         // raise exception;
     }
-    
+
     _currentSession._state = aCode;
     _currentSession = _currentSession._previous;
-    
+
 //    if (aCode == CPRunAbortedResponse)
         [self _removeRunModalLoop];
 }
@@ -545,12 +456,12 @@ CPRunContinuesResponse  = -1002;
 - (void)_removeRunModalLoop
 {
     var count = _eventListeners.length;
-    
+
     while (count--)
         if (_eventListeners[count]._callback === _CPRunModalLoop)
         {
             _eventListeners.splice(count, 1);
-            
+
             return;
         }
 }
@@ -588,12 +499,12 @@ CPRunContinuesResponse  = -1002;
 {
     aModalSession._previous = _currentSession;
     _currentSession = aModalSession;
-    
+
     var theWindow = aModalSession._window;
 
     [theWindow center];
     [theWindow makeKeyAndOrderFront:self];
-    
+
 //    [theWindow._bridge _obscureWindowsBelowModalWindow];
 
     [CPApp setCallback:_CPRunModalLoop forNextEventMatchingMask:CPAnyEventMask untilDate:nil inMode:0 dequeue:NO];
@@ -607,7 +518,7 @@ CPRunContinuesResponse  = -1002;
 {
     if (!_currentSession)
         return nil;
-    
+
     return _currentSession._window;
 }
 
@@ -652,7 +563,7 @@ CPRunContinuesResponse  = -1002;
     {
         if (_eventListeners[_eventListeners.length - 1]._mask & (1 << [anEvent type]))
             _eventListeners.pop()._callback(anEvent);
-        
+
         return;
     }
 
@@ -763,11 +674,11 @@ CPRunContinuesResponse  = -1002;
 
     if ([super tryToPerform:anAction with:anObject])
         return YES;
-    
+
     if([_delegate respondsToSelector:anAction])
     {
         [_delegate performSelector:anAction withObject:anObject];
-        
+
         return YES;
     }
 
@@ -787,9 +698,9 @@ CPRunContinuesResponse  = -1002;
 
     if (!target)
         return NO;
-    
+
     [target performSelector:anAction withObject:aSender];
-    
+
     return YES;
 }
 
@@ -808,10 +719,10 @@ CPRunContinuesResponse  = -1002;
 {
     if (!anAction)
         return nil;
-        
+
     if (aTarget)
         return aTarget;
-        
+
     return [self targetForAction:anAction];
 }
 
@@ -836,28 +747,28 @@ CPRunContinuesResponse  = -1002;
 {
     var responder = [aWindow firstResponder],
         checkWindow = YES;
-    
+
     while (responder)
     {
         if ([responder respondsToSelector:anAction])
             return responder;
-        
+
         if (responder == aWindow)
             checkWindow = NO;
-        
+
         responder = [responder nextResponder];
     }
-    
+
     if (checkWindow && [aWindow respondsToSelector:anAction])
         return aWindow;
-    
+
     var delegate = [aWindow delegate];
-    
+
     if ([delegate respondsToSelector:anAction])
         return delegate;
 
     var windowController = [aWindow windowController];
-    
+
     if ([windowController respondsToSelector:anAction])
         return windowController;
 
@@ -873,7 +784,7 @@ CPRunContinuesResponse  = -1002;
     Checks for a target in the following order:
     <ol>
         <li>a responder from the key window</li>
-        <li>a responder frmo the main window</li>
+        <li>a responder from the main window</li>
         <li>the CPApplication instance</li>
         <li>the application delegate</li>
         <li>the document controller</li>
@@ -886,34 +797,32 @@ CPRunContinuesResponse  = -1002;
 {
     if (!anAction)
         return nil;
-    
+
     var target = [self _targetForWindow:[self keyWindow] action:anAction];
-    
+
     if (target)
         return target;
-        
+
     target = [self _targetForWindow:[self mainWindow] action:anAction];
-    
+
     if (target)
         return target;
-    
+
     if ([self respondsToSelector:anAction])
         return self;
-    
+
     if ([_delegate respondsToSelector:anAction])
         return _delegate;
-        
+
     if ([_documentController respondsToSelector:anAction])
         return _documentController;
-    
+
     return nil;
 }
 
 - (void)setCallback:(Function)aCallback forNextEventMatchingMask:(unsigned int)aMask untilDate:(CPDate)anExpiration inMode:(CPString)aMode dequeue:(BOOL)shouldDequeue
 {
     _eventListeners.push(_CPEventListenerMake(aMask, aCallback));
-    
-    if (_eventListeners.length == 3) objj_debug_print_backtrace();
 }
 
 - (CPEvent)setTarget:(id)aTarget selector:(SEL)aSelector forNextEventMatchingMask:(unsigned int)aMask untilDate:(CPDate)anExpiration inMode:(CPString)aMode dequeue:(BOOL)shouldDequeue
@@ -937,14 +846,14 @@ CPRunContinuesResponse  = -1002;
     @param aContextInfo
 */
 - (void)beginSheet:(CPWindow)aSheet modalForWindow:(CPWindow)aWindow modalDelegate:(id)aModalDelegate didEndSelector:(SEL)aDidEndSelector contextInfo:(id)aContextInfo
-{    
+{
     var styleMask = [aSheet styleMask];
     if (!(styleMask & CPDocModalWindowMask))
     {
         [CPException raise:CPInternalInconsistencyException reason:@"Currently only CPDocModalWindowMask style mask is supported for attached sheets"];
         return;
     }
-    
+
     [aWindow orderFront:self];
     [aWindow _attachSheet:aSheet modalDelegate:aModalDelegate didEndSelector:aDidEndSelector contextInfo:aContextInfo];
 }
@@ -952,15 +861,15 @@ CPRunContinuesResponse  = -1002;
 - (void)endSheet:(CPWindow)sheet returnCode:(int)returnCode
 {
     var count = [_windows count];
-    
+
     while (--count >= 0)
     {
         var aWindow = [_windows objectAtIndex:count];
         var context = aWindow._sheetContext;
-    
+
         if (context != nil && context["sheet"] === sheet)
         {
-            context["returnCode"] = returnCode; 
+            context["returnCode"] = returnCode;
             [aWindow _detachSheetWindow];
             return;
         }
@@ -976,7 +885,7 @@ CPRunContinuesResponse  = -1002;
 {
     if(_fullArgsString !== window.location.hash)
         [self _reloadArguments];
-    
+
     return _args;
 }
 
@@ -986,28 +895,28 @@ CPRunContinuesResponse  = -1002;
     {
         _args = [];
         window.location.hash = @"#";
-        
+
         return;
     }
-    
+
     if([args class] != CPArray)
         args = [CPArray arrayWithObject:args];
-    
+
     _args = args;
-    
+
     var toEncode = [_args copy];
     for(var i=0, count = toEncode.length; i<count; i++)
         toEncode[i] = encodeURIComponent(toEncode[i]);
-    
+
     var hash = [toEncode componentsJoinedByString:@"/"];
-    
+
     window.location.hash = @"#" + hash;
 }
 
 - (void)_reloadArguments
 {
     _fullArgsString = window.location.hash;
-    
+
     if (_fullArgsString.length)
     {
         var args = _fullArgsString.substring(1).split("/");
@@ -1042,18 +951,18 @@ CPRunContinuesResponse  = -1002;
 
 - (void)_willBecomeActive
 {
-    [[CPNotificationCenter defaultCenter] postNotificationName:CPApplicationWillBecomeActiveNotification 
-                                                        object:self 
+    [[CPNotificationCenter defaultCenter] postNotificationName:CPApplicationWillBecomeActiveNotification
+                                                        object:self
                                                       userInfo:nil];
 }
 
 - (void)_didBecomeActive
 {
-    if (![self keyWindow] && _previousKeyWindow && 
+    if (![self keyWindow] && _previousKeyWindow &&
         [[self windows] indexOfObjectIdenticalTo:_previousKeyWindow] !== CPNotFound)
         [_previousKeyWindow makeKeyWindow];
 
-    if (![self mainWindow] && _previousMainWindow && 
+    if (![self mainWindow] && _previousMainWindow &&
         [[self windows] indexOfObjectIdenticalTo:_previousMainWindow] !== CPNotFound)
         [_previousMainWindow makeMainWindow];
 
@@ -1067,15 +976,15 @@ CPRunContinuesResponse  = -1002;
     _previousKeyWindow = nil;
     _previousMainWindow = nil;
 
-    [[CPNotificationCenter defaultCenter] postNotificationName:CPApplicationDidBecomeActiveNotification 
-                                                        object:self 
+    [[CPNotificationCenter defaultCenter] postNotificationName:CPApplicationDidBecomeActiveNotification
+                                                        object:self
                                                       userInfo:nil];
 }
 
 - (void)_willResignActive
 {
-    [[CPNotificationCenter defaultCenter] postNotificationName:CPApplicationWillResignActiveNotification 
-                                                        object:self 
+    [[CPNotificationCenter defaultCenter] postNotificationName:CPApplicationWillResignActiveNotification
+                                                        object:self
                                                       userInfo:nil];
 }
 
@@ -1096,8 +1005,8 @@ CPRunContinuesResponse  = -1002;
         [_previousMainWindow resignMainWindow];
     }
 
-    [[CPNotificationCenter defaultCenter] postNotificationName:CPApplicationDidResignActiveNotification 
-                                                        object:self 
+    [[CPNotificationCenter defaultCenter] postNotificationName:CPApplicationDidResignActiveNotification
+                                                        object:self
                                                       userInfo:nil];
 }
 
@@ -1125,7 +1034,7 @@ var _CPRunModalLoop = function(anEvent)
 
     var theWindow = [anEvent window],
         modalSession = CPApp._currentSession;
-    
+
     if (theWindow == modalSession._window || [theWindow worksWhenModal])
         [theWindow sendEvent:anEvent];
 }
@@ -1139,6 +1048,13 @@ var _CPRunModalLoop = function(anEvent)
 
 function CPApplicationMain(args, namedArgs)
 {
+
+#if PLATFORM(DOM)
+    // hook to allow recorder, etc to manipulate things before starting AppKit
+    if (window.parent !== window && typeof window.parent._childAppIsStarting === "function")
+        window.parent._childAppIsStarting(window);
+#endif
+
     var mainBundle = [CPBundle mainBundle],
         principalClass = [mainBundle principalClass];
 
@@ -1217,13 +1133,81 @@ var _CPAppBootstrapperActions = nil;
 
         return YES;
     }
+    else
+        [self loadCiblessBrowserMainMenu];
 
     return NO;
+}
+
++ (void)loadCiblessBrowserMainMenu
+{
+    var mainMenu = [[CPMenu alloc] initWithTitle:@"MainMenu"];
+
+    // FIXME: We should implement autoenabling.
+    [mainMenu setAutoenablesItems:NO];
+
+    var bundle = [CPBundle bundleForClass:[CPApplication class]],
+        newMenuItem = [[CPMenuItem alloc] initWithTitle:@"New" action:@selector(newDocument:) keyEquivalent:@"n"];
+
+    [newMenuItem setImage:[[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"CPApplication/New.png"] size:CGSizeMake(16.0, 16.0)]];
+    [newMenuItem setAlternateImage:[[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"CPApplication/NewHighlighted.png"] size:CGSizeMake(16.0, 16.0)]];
+
+    [mainMenu addItem:newMenuItem];
+
+    var openMenuItem = [[CPMenuItem alloc] initWithTitle:@"Open" action:@selector(openDocument:) keyEquivalent:@"o"];
+
+    [openMenuItem setImage:[[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"CPApplication/Open.png"] size:CGSizeMake(16.0, 16.0)]];
+    [openMenuItem setAlternateImage:[[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"CPApplication/OpenHighlighted.png"] size:CGSizeMake(16.0, 16.0)]];
+
+    [mainMenu addItem:openMenuItem];
+
+    var saveMenu = [[CPMenu alloc] initWithTitle:@"Save"],
+        saveMenuItem = [[CPMenuItem alloc] initWithTitle:@"Save" action:@selector(saveDocument:) keyEquivalent:nil];
+
+    [saveMenuItem setImage:[[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"CPApplication/Save.png"] size:CGSizeMake(16.0, 16.0)]];
+    [saveMenuItem setAlternateImage:[[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"CPApplication/SaveHighlighted.png"] size:CGSizeMake(16.0, 16.0)]];
+
+    [saveMenu addItem:[[CPMenuItem alloc] initWithTitle:@"Save" action:@selector(saveDocument:) keyEquivalent:@"s"]];
+    [saveMenu addItem:[[CPMenuItem alloc] initWithTitle:@"Save As" action:@selector(saveDocumentAs:) keyEquivalent:nil]];
+
+    [saveMenuItem setSubmenu:saveMenu];
+
+    [mainMenu addItem:saveMenuItem];
+
+    var editMenuItem = [[CPMenuItem alloc] initWithTitle:@"Edit" action:nil keyEquivalent:nil],
+        editMenu = [[CPMenu alloc] initWithTitle:@"Edit"],
+
+        undoMenuItem = [[CPMenuItem alloc] initWithTitle:@"Undo" action:@selector(undo:) keyEquivalent:CPUndoKeyEquivalent],
+        redoMenuItem = [[CPMenuItem alloc] initWithTitle:@"Redo" action:@selector(redo:) keyEquivalent:CPRedoKeyEquivalent];
+
+    [undoMenuItem setKeyEquivalentModifierMask:CPUndoKeyEquivalentModifierMask];
+    [redoMenuItem setKeyEquivalentModifierMask:CPRedoKeyEquivalentModifierMask];
+
+    [editMenu addItem:undoMenuItem];
+    [editMenu addItem:redoMenuItem];
+
+    [editMenu addItem:[[CPMenuItem alloc] initWithTitle:@"Cut" action:@selector(cut:) keyEquivalent:@"x"]],
+    [editMenu addItem:[[CPMenuItem alloc] initWithTitle:@"Copy" action:@selector(copy:) keyEquivalent:@"c"]],
+    [editMenu addItem:[[CPMenuItem alloc] initWithTitle:@"Paste" action:@selector(paste:) keyEquivalent:@"v"]];
+
+    [editMenuItem setSubmenu:editMenu];
+    [editMenuItem setHidden:YES];
+
+    [mainMenu addItem:editMenuItem];
+
+    [mainMenu addItem:[CPMenuItem separatorItem]];
+
+    [CPApp setMainMenu:mainMenu];
 }
 
 + (void)cibDidFinishLoading:(CPCib)aCib
 {
     [self performActions];
+}
+
++ (void)cibDidFailToLoad:(CPCib)aCib
+{
+    throw new Error("Could not load main cib file (Did you forget to nib2cib it?).");
 }
 
 + (void)reset

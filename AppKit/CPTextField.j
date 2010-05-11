@@ -813,7 +813,7 @@ CPTextFieldStatePlaceholder = CPThemeState("placeholder");
     if (![CPPlatform isBrowser])
     {
         [self copy:sender];
-        [self deleteBackwards:sender];
+        [self deleteBackward:sender];
     }
 }
 
@@ -826,7 +826,7 @@ CPTextFieldStatePlaceholder = CPThemeState("placeholder");
         if (![[pasteboard types] containsObject:CPStringPboardType])
             return;
 
-        [self deleteBackwards:sender];
+        [self deleteBackward:sender];
 
         var selectedRange = [self selectedRange],
             stringValue = [self stringValue],
@@ -912,7 +912,7 @@ CPTextFieldStatePlaceholder = CPThemeState("placeholder");
     [self selectText:sender];
 }
 
-- (void)deleteBackwards:(id)sender
+- (void)deleteBackward:(id)sender
 {
     var selectedRange = [self selectedRange],
         stringValue = [self stringValue],
@@ -997,7 +997,7 @@ CPTextFieldStatePlaceholder = CPThemeState("placeholder");
     return bounds;
 }
 
-- (CGRect)bezelRectForBounds:(CFRect)bounds
+- (CGRect)bezelRectForBounds:(CGRect)bounds
 {
     var bezelInset = [self currentValueForThemeAttribute:@"bezel-inset"];
 
@@ -1085,6 +1085,22 @@ CPTextFieldStatePlaceholder = CPThemeState("placeholder");
         [contentView setTextShadowColor:[self currentValueForThemeAttribute:@"text-shadow-color"]];
         [contentView setTextShadowOffset:[self currentValueForThemeAttribute:@"text-shadow-offset"]];
     }
+}
+
+- (void)takeValueFromKeyPath:(CPString)aKeyPath ofObjects:(CPArray)objects
+{
+    var count = objects.length,
+        value = [objects[0] valueForKeyPath:aKeyPath];
+
+    [self setStringValue:value];
+    [self setPlaceholderString:@""];
+
+    while (count-- > 1)
+        if (value !== [objects[count] valueForKeyPath:aKeyPath])
+        {
+            [self setPlaceholderString:@"Multiple Values"];
+            [self setStringValue:@""];
+        }
 }
 
 @end

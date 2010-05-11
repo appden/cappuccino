@@ -127,9 +127,8 @@ var PlatformWindows = [CPSet set];
 // Define up here so compressor knows about em.
 var CPDOMEventGetClickCount,
     CPDOMEventStop,
-    StopDOMEventPropagation;
-
-var _DOMEventGuard;
+    StopDOMEventPropagation,
+    StopContextMenuDOMEventPropagation;
 
 //right now we hard code q, w, r and t as keys to propogate
 //these aren't normal keycodes, they are with modifier key codes
@@ -279,7 +278,7 @@ var supportsNativeDragAndDrop = [CPPlatform supportsDragAndDrop];
     _DOMBodyElement = theDocument.getElementById("cappuccino-body") || theDocument.body;
 
     // FIXME: Always do this?
-    if ([CPPlatform supportsDragAndDrop])
+    if (supportsNativeDragAndDrop)
         _DOMBodyElement.style["-khtml-user-select"] = "none";
 
     _DOMBodyElement.webkitTouchCallout = "none";
@@ -312,6 +311,10 @@ var supportsNativeDragAndDrop = [CPPlatform supportsDragAndDrop];
         mouseEventImplementation = class_getMethodImplementation(theClass, mouseEventSelector),
         mouseEventCallback = function (anEvent) { mouseEventImplementation(self, nil, anEvent); },
         
+        contextMenuEventSelector = @selector(contextMenuEvent:),
+        contextMenuEventImplementation = class_getMethodImplementation(theClass, contextMenuEventSelector),
+        contextMenuEventCallback = function (anEvent) { return contextMenuEventImplementation(self, nil, anEvent); },
+
         scrollEventSelector = @selector(scrollEvent:),
         scrollEventImplementation = class_getMethodImplementation(theClass, scrollEventSelector),
         scrollEventCallback = function (anEvent) { scrollEventImplementation(self, nil, anEvent); },
@@ -335,6 +338,7 @@ var supportsNativeDragAndDrop = [CPPlatform supportsDragAndDrop];
         theDocument.addEventListener("mouseup", mouseEventCallback, NO);
         theDocument.addEventListener("mousedown", mouseEventCallback, NO);
         theDocument.addEventListener("mousemove", mouseEventCallback, NO);
+        theDocument.addEventListener("contextmenu", contextMenuEventCallback, NO);
 
         theDocument.addEventListener("beforecopy", copyEventCallback, NO);
         theDocument.addEventListener("beforecut", copyEventCallback, NO);
@@ -362,6 +366,7 @@ var supportsNativeDragAndDrop = [CPPlatform supportsDragAndDrop];
             theDocument.removeEventListener("mouseup", mouseEventCallback, NO);
             theDocument.removeEventListener("mousedown", mouseEventCallback, NO);
             theDocument.removeEventListener("mousemove", mouseEventCallback, NO);
+            theDocument.removeEventListener("contextmenu", contextMenuEventCallback, NO);
 
             theDocument.removeEventListener("keyup", keyEventCallback, NO);
             theDocument.removeEventListener("keydown", keyEventCallback, NO);
@@ -394,6 +399,7 @@ var supportsNativeDragAndDrop = [CPPlatform supportsDragAndDrop];
         theDocument.attachEvent("onmousedown", mouseEventCallback);
         theDocument.attachEvent("onmousemove", mouseEventCallback);
         theDocument.attachEvent("ondblclick", mouseEventCallback);
+        theDocument.attachEvent("oncontextmenu", contextMenuEventCallback);
         
         theDocument.attachEvent("onkeyup", keyEventCallback);
         theDocument.attachEvent("onkeydown", keyEventCallback);
@@ -416,6 +422,7 @@ var supportsNativeDragAndDrop = [CPPlatform supportsDragAndDrop];
             theDocument.detachEvent("onmousedown", mouseEventCallback);
             theDocument.detachEvent("onmousemove", mouseEventCallback);
             theDocument.detachEvent("ondblclick", mouseEventCallback);
+            theDocument.detachEvent("oncontextmenu", contextMenuEventCallback);
 
             theDocument.detachEvent("onkeyup", keyEventCallback);
             theDocument.detachEvent("onkeydown", keyEventCallback);
@@ -460,7 +467,7 @@ var supportsNativeDragAndDrop = [CPPlatform supportsDragAndDrop];
     [PlatformWindows addObject:self];
 
     // FIXME: cpSetFrame?
-    _DOMWindow.document.write("<html><head></head><body style = 'background-color:transparent;'></body></html>");
+    _DOMWindow.document.write("<!DOCTYPE html><html lang='en'><head></head><body style='background-color:transparent;'></body></html>");
     _DOMWindow.document.close();
 
     if (![CPPlatform isBrowser])
@@ -506,6 +513,11 @@ var supportsNativeDragAndDrop = [CPPlatform supportsDragAndDrop];
 
         DOMDragElement.style.left = -_CGRectGetWidth(draggedWindowFrame) + "px";
         DOMDragElement.style.top = -_CGRectGetHeight(draggedWindowFrame) + "px";
+
+        var parentNode = DOMDragElement.parentNode;
+
+        if (parentNode)
+            parentNode.removeChild(DOMDragElement);
 
         _DOMBodyElement.appendChild(DOMDragElement);
 
@@ -804,7 +816,6 @@ var supportsNativeDragAndDrop = [CPPlatform supportsDragAndDrop];
     }
 }
 
-
 - (void)_checkPasteboardElement
 {
     var value = _DOMPasteboardElement.value;
@@ -840,12 +851,13 @@ var supportsNativeDragAndDrop = [CPPlatform supportsDragAndDrop];
     if(!aDOMEvent)
         aDOMEvent = window.event;
 
+    var location = nil;
     if (CPFeatureIsCompatible(CPJavaScriptMouseWheelValues_8_15))
     {
-        var x = 0.0,
-            y = 0.0,
+        var x = aDOMEvent._offsetX || 0.0,
+            y = aDOMEvent._offsetY || 0.0,
             element = aDOMEvent.target;
-        
+
         while (element.nodeType !== 1)
             element = element.parentNode;
 
@@ -859,11 +871,13 @@ var supportsNativeDragAndDrop = [CPPlatform supportsDragAndDrop];
             } while (element = element.offsetParent);
         }
     
-        var location = _CGPointMake((x + ((aDOMEvent.clientX - 8) / 15)), (y + ((aDOMEvent.clientY - 8) / 15)));
+        location = _CGPointMake((x + ((aDOMEvent.clientX - 8) / 15)), (y + ((aDOMEvent.clientY - 8) / 15)));
     }
+    else if (aDOMEvent._overrideLocation)
+        location = aDOMEvent._overrideLocation;
     else
-        var location = _CGPointMake(aDOMEvent.clientX, aDOMEvent.clientY);
-        
+        location = _CGPointMake(aDOMEvent.clientX, aDOMEvent.clientY);
+
     var deltaX = 0.0,
         deltaY = 0.0,
         windowNumber = 0,
@@ -872,7 +886,7 @@ var supportsNativeDragAndDrop = [CPPlatform supportsDragAndDrop];
                         (aDOMEvent.ctrlKey ? CPControlKeyMask : 0) | 
                         (aDOMEvent.altKey ? CPAlternateKeyMask : 0) | 
                         (aDOMEvent.metaKey ? CPCommandKeyMask : 0);
-          
+
     StopDOMEventPropagation = YES;
 
     var theWindow = [self hitTest:location];
@@ -1047,11 +1061,12 @@ var supportsNativeDragAndDrop = [CPPlatform supportsDragAndDrop];
     {
         if(_mouseIsDown)
         {
-            event = _CPEventFromNativeMouseEvent(aDOMEvent, CPLeftMouseUp, location, modifierFlags, timestamp, windowNumber, nil, -1, CPDOMEventGetClickCount(_lastMouseUp, timestamp, location), 0);
+            event = _CPEventFromNativeMouseEvent(aDOMEvent, _mouseDownIsRightClick ? CPRightMouseUp : CPLeftMouseUp, location, modifierFlags, timestamp, windowNumber, nil, -1, CPDOMEventGetClickCount(_lastMouseUp, timestamp, location), 0);
         
             _mouseIsDown = NO;
             _lastMouseUp = event;
             _mouseDownWindow = nil;
+            _mouseDownIsRightClick = NO;
         }
 
         if(_DOMEventMode)
@@ -1091,8 +1106,13 @@ var supportsNativeDragAndDrop = [CPPlatform supportsDragAndDrop];
             _DOMBodyElement.style["-khtml-user-drag"] = "element";
         }
 
-        event = _CPEventFromNativeMouseEvent(aDOMEvent, CPLeftMouseDown, location, modifierFlags, timestamp, windowNumber, nil, -1, CPDOMEventGetClickCount(_lastMouseDown, timestamp, location), 0);
-                    
+        var button = aDOMEvent.button;
+        _mouseDownIsRightClick = button == 2 || (button == 0 && modifierFlags & CPControlKeyMask);
+
+        StopContextMenuDOMEventPropagation = YES;
+
+        event = _CPEventFromNativeMouseEvent(aDOMEvent, _mouseDownIsRightClick ? CPRightMouseDown : CPLeftMouseDown, location, modifierFlags, timestamp, windowNumber, nil, -1, CPDOMEventGetClickCount(_lastMouseDown, timestamp, location), 0);
+
         _mouseIsDown = YES;
         _lastMouseDown = event;
     }
@@ -1102,7 +1122,7 @@ var supportsNativeDragAndDrop = [CPPlatform supportsDragAndDrop];
         if (_DOMEventMode)
             return;
 
-        event = _CPEventFromNativeMouseEvent(aDOMEvent, _mouseIsDown ? CPLeftMouseDragged : CPMouseMoved, location, modifierFlags, timestamp, windowNumber, nil, -1, 1, 0);
+        event = _CPEventFromNativeMouseEvent(aDOMEvent, _mouseIsDown ? (_mouseDownIsRightClick ? CPRightMouseDragged : CPLeftMouseDragged) : CPMouseMoved, location, modifierFlags, timestamp, windowNumber, nil, -1, 1, 0);
     }
 
     var isDragging = [[CPDragServer sharedDragServer] isDragging];
@@ -1123,7 +1143,15 @@ var supportsNativeDragAndDrop = [CPPlatform supportsDragAndDrop];
     [[CPRunLoop currentRunLoop] limitDateForMode:CPDefaultRunLoopMode];
 }
 
- (CPArray)orderedWindowsAtLevel:(int)aLevel
+- (void)contextMenuEvent:(DOMEvent)aDOMEvent
+{
+    if (StopContextMenuDOMEventPropagation)
+        CPDOMEventStop(aDOMEvent, self);
+
+    return !StopContextMenuDOMEventPropagation;
+}
+
+- (CPArray)orderedWindowsAtLevel:(int)aLevel
 {
     var layer = [self layerAtLevel:aLevel create:NO];
 
@@ -1167,6 +1195,7 @@ var supportsNativeDragAndDrop = [CPPlatform supportsDragAndDrop];
 
         [_windowLevels insertObject:aLevel atIndex:insertionIndex];
         layer._DOMElement.style.zIndex = aLevel;
+
         _DOMBodyElement.appendChild(layer._DOMElement);
     }
     
@@ -1262,6 +1291,19 @@ var supportsNativeDragAndDrop = [CPPlatform supportsDragAndDrop];
 - (BOOL)_willPropagateCurrentDOMEvent
 {
     return !StopDOMEventPropagation;
+}
+
+- (void)_propagateContextMenuDOMEvent:(BOOL)aFlag
+{
+    if (aFlag && CPBrowserIsEngine(CPGeckoBrowserEngine))
+        StopDOMEventPropagation = !aFlag;
+
+    StopContextMenuDOMEventPropagation = !aFlag;
+}
+
+- (BOOL)_willPropagateContextMenuDOMEvent
+{
+    return StopContextMenuDOMEventPropagation;
 }
 
 - (CPWindow)hitTest:(CPPoint)location
