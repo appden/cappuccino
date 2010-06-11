@@ -226,12 +226,6 @@ CPWebViewScrollNative                           = 2;
 
                 [_frameView setFrameSize:CGSizeMake(width, height)];
             }
-            else
-            {
-                CPLog.warn("using default size 800*1600");
-            
-                [_frameView setFrameSize:CGSizeMake(800, 1600)];
-            }
 
             [_frameView scrollRectToVisible:visibleRect];
         }
